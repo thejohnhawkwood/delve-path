@@ -1,0 +1,444 @@
+===== PAGE 52 =====
+P a g e | 52 
+ 
+7. Survey Calculation Methods 
+7.1 Examples of Current Methods 
+ 
+Over the years there have been several 
+methods of calculating survey positions 
+from the raw observations of measure 
+depth, inclination and direction.  At the 
+simplest level if a straight line model is 
+used over a length dM with inclination I 
+and Azimuth A, we can derive a shift in 
+coordinates as in figure 42. 
+ 
+This simple technique is often referred 
+to as the Tangential Method and is 
+relatively easy to hand calculate.  
+However, the assumption that the 
+inclination and direction remain 
+unchanged for the interval can cause 
+significant errors to accumulate along 
+the wellpath. 
+ 
+ 
+ 
+ 
+ 
+An improvement to this was the ‘Average Angle Method’ where the azimuth and inclination used in the above 
+formulas was simply the average of the values at the start and end of the interval. 
+ 
+In the days when there were no personal computers the average angle was the preferred method of calculating 
+surveys and it produces results similar to the more recent minimum curvature method currently in use. 
+ 
+ 
+ 
+ 
+      Average Angle Example 
+ 
+      • 
+Md1 = 1000   Inc1 = 28  Azi1 = 54 
+      • 
+Md2 = 1100   Inc2 = 32  Azi2 = 57 
+      • 
+Delta MD = 100 
+      • 
+Average Inc = 30 
+      • 
+Average Azi = 55.5 
+      • 
+Delta East = 100 sin(30) sin(55.5) = 41.2 
+      • 
+Delta North = 100 sin(30) cos(55.5) = 28.3 
+      • 
+Delta TVD = 100 cos(30) = 86.6 
+ 
+ 
+ 
+Figure 42: Tangential method to derive a shift in coordinates 
+
+===== PAGE 53 =====
+P a g e | 53 
+ 
+A further improvement was the Balanced Tangential Method whereby the angle observed at a survey station are 
+applied half way back into the previous interval and half way forward into the next. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+These techniques all suffer from the weakness that the wellpath is modelled as a straight line.  More recently, the 
+computational ability of computers has allowed a more sophisticated approach.  In the summary slide figure 44 
+we see two curved models. 
+ 
+The one on the left assumes that the wellpath fits on the surface of a cylinder and therefore can have a horizontal 
+and vertical radius.  The one on the right assumes the wellpath fits on the surface of a sphere and simply has one 
+Figure 43: Balanced Tangential Method 
+Figure 44: Methods of dealing with curvature 
+
+===== PAGE 54 =====
+P a g e | 54 
+ 
+radius in a 3D plane that minimizes the curvature required to fit the angular observations.  This method, known as 
+the ‘Minimum Curvature’ method, is now effectively the industry standard. 
+ 
+ 
+Imagine a unit vector tangential to a survey point.  Its shift in x, y and z would be as shown above. The angle 
+between any two unit vectors can be derived from inverse cosine of the vector dot product of the two vectors. 
+This angle is the angle subtended at the centre of the arc and is assumed to have occurred over the observed 
+change in measured depth.  From this the radius can be derived and a simple kite formed in 3D space whose 
+smaller arm length follows vector A then vector B to arrive at position B. 
+ 
+Notice however that the method assumes a constant arc from one station to the next and particularly when using 
+mud motors, this is unlikely to be the case. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+CONTENTS 
+ 
+ 
+ 
+ 
+Figure 45: Minimum curvature method 
+
+===== PAGE 55 =====
+P a g e | 55 
+ 
+8. Survey Frequency 
+8.1 Determining TVD 
+ 
+Consider two possible procedures for drilling from A to B - both of these trajectories start and end with the same 
+attitude and have the same measured depth difference. 
+ 
+ 
+Suppose we were at 50 degrees inclination at A and built to 60 degrees inclination at B. In the case on the left the 
+curve comes first followed by a straight and vice versa on the right. Clearly the wellpaths are different but the 
+surveys would be identical since the measured depths are the same, the azimuth has not changed and the 
+inclinations have risen by 10 degrees.  Because a single arc is applied, there is a potential for significant TVD error 
+to accumulate along the wellpath if the changes in geometry are not sufficiently observed.   
+ 
+For this reason, it is often recommended that when building angle faster than 3 degrees per 100 ft (or 30 m) it is 
+best to survey every pipe joint rather than every stand to ensure adequate observations to truly represent the 
+well path.  In the next chapter it will be seen that a rate gyro can observe at very short intervals indeed with no 
+additional survey time and in general these are better at determining TVD than MWD.  Normally however, gyro 
+surveys are interpolated at 10 or 20 ft intervals or equivalent just for ease of handling and processing the data. 
+ 
+8.2 Effect of Survey Interval on Well Path Positional Uncertainty 
+ 
+It is important to note that our industry standard systematic error models have not traditionally modelled for the 
+effect of survey interval. It is very hard to quantify what the effect of missing data might have been and so the 
+error models have been published with the caveat that adequate surveys must be taken to accurately reflect the 
+geometry of the wellpath. 
+ 
+Figure 46: Example drilling trajectories 
+
+===== PAGE 56 =====
+P a g e | 56 
+ 
+ 
+Clearly if the minimum curvature algorithm were applied to the survey on the left where the inclination and 
+azimuth are identical at the start and end of the curve, a simple straight line path would be assumed whereas the 
+reality is better represented by the surveys on the right. I conducted a study using some of Shell’s survey 
+database a few years ago. I removed every second survey from some high intensity gyro surveys and recalculated. 
+Then I removed more and plotted the errors against the survey interval. The actual positional error grew in a 
+quadratic. Here is one example plot. 
+ 
+ 
+On the x axis is the survey interval and the scatter on the y axis represents positional errors from the original 
+surveyed position. The green histogram is a set of average positional errors for each survey interval in 10ft 
+increments. 
+ 
+The approximate equation relating these is of the order of .3 x (Interval/100)^2 which has an interesting effect. If 
+this is even close to correct then reducing our survey interval from 90ft to 30ft reduces our positional error by a 
+factor of 9 not 3. Similarly, we might expect that missing a 90ft survey will increase our positional error due to 
+lack of surveys by a factor of 4 rather than 2. 
+
+===== PAGE 57 =====
+P a g e | 57 
+ 
+ 
+What should we do about this?  Some companies would argue that a simple additional inclination and azimuth 
+error should be added in proportion to their respective changes from one survey to the next. For example, we 
+might add .1 x azimuth change as an azimuth error and perhaps 0.1 x inclination change as an inclination error. 
+The shorter the interval, the smaller the change and therefore the smaller the error applied. Since the md 
+difference is also proportional to the interval, this has a square term on interval just like the study shows. Others 
+would argue that as we are trying to model missing data, we might generate misleading uncertainty models and 
+we should cover this by best practice. 
+Most companies agree that when the dogleg severity exceeds 3 degs / 100ft it is good practice to survey every 
+single rather than every stand. 
+ 
+However, there are some occasions where the lack of surveys has to be remedied long after the event. 
+ 
+Sometimes when a well is misplaced in TVD, it is necessary to re-analyse the MWD survey to obtain a better 
+estimate of TVD.  This is done by including the slide sheet information.  The technique can only be used as a rough 
+guide to the likely TVD adjustment required but has often explained poor production results or severe 
+disagreement between gyro and MWD depths. 
+ 
+Using the slide sheet in figure 47 as an example: 
+ 
+Looking at the data for BHA 6, we can see a few points where surveys were taken and several changes from 
+rotating to oriented (sliding) mode.  The lengths and toolfaces are listed for each slide.  Whilst these values will 
+only be approximate it is possible to then estimate the wellbore attitude at the points where the slides began and 
+ended. 
+ 
+Firstly if we take the total curvature generated over the BHA run by measuring the angle changes between 
+surveys (see minimum curvature described above in chapter 7) we can work out the dogleg severity capability of 
+Figure 47: Typical slide sheet 
+
+===== PAGE 58 =====
+P a g e | 58 
+ 
+this assembly.  If we then apply that curvature on the toolfaces quoted, it is possible to determine a fill in survey 
+at the beginning and end of each slide by using the approximation that the inclination change will be: 
+ 
+DLS x length x cos(Toolface) and the azimuth change will be the DLS x length x sin(Toolface) / sin(Inclination) 
+ 
+-  where DLS means dogleg severity in degrees per unit length. This allows us to complete surveys at the start and 
+end of each slide and minimum curvature will then be more valid when joining the points.  
+ 
+This assumes that: 
+1. 
+The DLS is unchanged during the run 
+2. 
+The curvature all happens when sliding 
+3. 
+The toolface was constant during the slide 
+ 
+These assumptions are very simplistic but the analysis will generally give a better idea of TVD than the assumption 
+that the sparse surveys can be safely joined with 3D constant arcs. 
+ 
+ 
+ 
+ 
+CONTENTS 
+ 
+ 
+
+===== PAGE 59 =====
+P a g e | 59 
+ 
+9. Gyro Surveying 
+9.1 Background and History of Gyros 
+ 
+What is a Gyro? 
+A Gyroscope is a device which enables us to measure or maintain an orientation in free space and rotor gyros 
+specifically, operate on the principle of the conservation of angular momentum. The first gyros were built early in 
+the 19th century as spinning spheres or disks (rotors), with designs incorporating one, two or three gimbals, 
+providing the rotor spin axis with up to three degrees of freedom. These early systems were predominantly used 
+within the academic community, to study gyroscopic effects as rotor speeds (angular momentum) could not be 
+sustained for long periods, due to bearing friction effects. The development of the electric motor overcame this 
+rotation decay problem and lead to the first designs of prototype gyrocompasses during the 1860’s. 
+ 
+As with most scientific and technology advances, continued development and refinement was propagated and 
+accelerated to address military applications and by the early 1900’s gyros were being used in many attitude 
+control, orientation and navigation applications. Rotor gyros are still by far the most common system used by the 
+oil industry. 
+ 
+During the second half of the 20th century several additional technologies were developed and exploited 
+providing gyroscopic capabilities. These included: 
+• 
+Vibrating Gyros 
+• 
+Hemispherical Resonator Gyros 
+• 
+Quartz Rate Sensors 
+• 
+MHD Sensor 
+• 
+Fibre Optic Gyros 
+• 
+Laser Gyros 
+• 
+MEMS Gyros 
+ 
+The systems currently considered to have the most potential for the oil industry are the Laser and MEMS systems. 
+Indeed, Inteq developed and successfully marketed and operated the highly accurate RIGS (Ring-Laser Inertial 
+Gyro Surveyor) for many years servicing the North Sea. The current performance capability of the MEMS unit is 
+still less than desired but is regarded as having potential for the future. 
+ 
+ 
+ 
+ 
+
+===== PAGE 60 =====
+P a g e | 60 
+ 
+9.2 Oilfield Applications – A Brief History 
+ 
+In the early years of oil well drilling the process of drilling the borehole was more of an art than a science. The 
+general principals of geology and exploration were understood and followed but the effects of formation changes 
+and dip on bit deflection and hence borehole trajectory were not clearly understood and largely ignored. This 
+perpetuated state of ignorance lead to many unresolved lease disputes, where wells drilled and brought on 
+stream, close to an adjacent lease, would often result in diminished production rates on the adjacent lease wells. 
+However, as now, wells already in production were cased and the magnetic compass based survey instruments 
+available, could not provide post completion trajectory data. Throughout this time, many inclination-only devices 
+were developed, later versions of which were accurate to 1 or 2 degrees throughout their operating range. 
+ 
+In 1928 Alexander Anderson published a study of Borehole Survey Inclination Data obtained from a significant 
+population of wells from various locations. Anderson had developed a Pendulum Instrument, the position of 
+which was recorded on film as the tool was lowered in the borehole. This publication, illustrating universal and 
+significant wellbore deviation, brought focus on the extent of the problem within the industry. As a direct result 
+of Andersons study, J. N. Pew, then the Vice President of Sun Oil Co. instructed a team of Engineers working out 
+of the Sun Research Laboratory in Dallas, to design and develop instruments which would provide the Inclination 
+of the borehole and the Direction of that Inclination within casing. The 5.5” SURWEL Gyro Instrument 
+incorporated a Gyro Compass Face superimposed over a Bubble Level Unit with the permanent record obtained 
+with a Camera.           
+ 
+The Sperry Gyroscope Co. was chosen as the Gyro supplier and with each company holding a 50 per cent stake in 
+the new company, the Sperry-Sun Well Surveying Company was formed and gyro referenced borehole surveying 
+became a reality on 9th October 1929. 
+ 
+9.3 Chronology of Gyro Development 
+1920’s: Several designs of Inclinometers and very basic Magnetic Compasses are in use. Companies of note 
+operating Directional Survey Services are H. John Eastman, Hewitt Kuster and Alexander Anderson. 
+1929: First Gyro Survey Tool designed and built by Sperry-Sun Well Surveying Company, a joint venture between 
+Sun Oil and Sperry Gyroscope Co. The gyro had a DC Rotor speed of 14,000 RPM and was 5.5”Dia. 
+1930: Gyro Survey Tool Data used in settlement of many Lease Line violation cases in East Texas and California. 
+In-Run and Out-Run Data were recorded. 
+1936: Gyro Tool Intercardinal Error and Drift Curve Corrections, refined to improve accuracy of survey data in 
+inclined boreholes. 
+Survey Tool True Centre Correction methodology developed using a two dimensional Polar Coordinate 
+System Calculation.  
+1939: 1st K Monel Non Magnetic Drill Collar designed (Not a gyro but notable) 
+1945: Humphrey (Gyro) provides Instrumentation to Directional Service Companies for the first time (Post 
+WW11 manufacturing surplus) 
+1947: Transistors developed but not yet used by industry. 
+Sperry-Sun buys out Sperry Gyroscopes interest in Sperry-Sun Well Surveying Company. 
+1950’s: By late 1940’s wellbores get deeper and smaller with 5” Casing frequently used necessitating a 
+requirement for smaller Gyro Tools. 
+1960: East Texas Railroad Commission Scandals again encourage tool development. Many wellbores are small 
+diameter (5” Casing) and some have > 65 deg Inclination. 
+1961: Use of Solid State Electronics for first time in Instrument Timers and Solenoids for Film Advance 
+mechanisms. Computers used for Survey Calculations at the Office. Field Data continued to be hand 
+calculated until mid-seventies. 
+1961: Atomic Energy Commission (AEC) in the USA uses Gyro Survey Tools in 4” – 144” Dia. Test Holes, drilled 
+800 – 6000 ft deep, in Nevada and Alaska. Project ends in 1976. 
+
+===== PAGE 61 =====
+P a g e | 61 
+ 
+1962: 3” Dia. Surwell Gyro built utilizing 40,000 rpm AC Rotor. 
+1964: Counter Claims made against Gyro Survey accuracy related to numerous Law Suits. A Test Pipe is laid 
+down the Hurricane Messa in Utah. Over 2000ft of Aluminium Irrigation Pipe is fixed down the hillside on 
+a continuously irregular course. The first 200ft was near vertical with sections of the pipe path reaching 
+60-70 degs of inclination. Multiple surveys were performed with both Gyro and Magnetic tools, with 
+surveys taken at 25 ft intervals. In the final analysis the accuracy of both Survey Systems were proven and 
+the East Texas Claims Issues finally settled. 
+1.75” Gyro Tools developed using 26,000 rpm AC Rotors. Specifically designed for Directional Drilling Tool 
+Orientation and surveying of Production wells in Tubing. 
+1971: Atomic Energy Commission Test Bore intersected at 6000 ft TD with Bottom Hole location land surveyed 
+in at < 5 ft variance/error.  
+1974: Multi-well Platform drilling is prevalent. Level Rotor Gyro System developed with glass file Mercury 
+Switch used to control the inner gimbal horizontal position to +/- 1-2degs but system is sensitive to 
+gimbal/switch attitude, resulting in azimuth error propagation. 
+1977: Introduction of Surface Recording Gyros (SRG’s - 3” and 1.75” versions), transmitting data to surface via 
+Wireline. Inner gimbal position now monitored and controlled by electronic resolver to +/- 0.01 degs 
+resulting in significantly reduced error propagation. 
+1978: Ferranti Full Inertial System introduced into the North Sea as reconfigured Harrier Jump Jet IN System, 
+developed for Shell, Mobil, BNOC (BP) and marketed by Eastman Christiansen (Inteq). Proven Accuracy < 
+1/1000 ft potentially at all attitudes.    
+ 
+9.4 Improving Performance and Service Capability 
+ 
+As outlined above, Gyro Survey Tools were initially and primarily introduced into the industry, to provide a means 
+of obtaining or checking borehole attitude, when the wellbore was already cased, negating the application or 
+repeated use of magnetic based tools (Lease Scandals). Similar conditions were to foster the requirement for 
+reduced diameter tools when later legal argument ensued over deeper smaller diameter wells. However, the 
+primary motivation for technology advancement has been the requirement to survey ever deeper, higher angle 
+boreholes (beyond horizontal), with significant azimuthal change at greater latitudes. 
+ 
+The first gyros used by the industry had no means of inner gimbal/spin axis control but the surveyor could 
+determine its approximate position from the film record at each survey station. These gyros were originally 
+intended for use up to 20 – 30 degs inclination. However, as borehole inclinations increased, hardware 
+improvements were made and operational techniques were developed which enabled these tools to be used 
+successfully beyond 60 degs inclination. As noted above, Gimbal Tilt control and Drift Curve correction methods 
+were refined to better account for the increasingly difficult operating conditions encountered and its interactive 
+effects on gyro stability and data quality at a relatively early stage. 
+ 
+9.5 The Gyro Survey Process 
+9.5.1 Surface Reference Orientation 
+Prior to the use of North Seeking Gyros the gyro had to be ‘Referenced’ and set to a known bearing at surface (On 
+the rig floor) before entering the borehole. On land, this was a relatively simple process involving the 
+establishment of a Sight Mark or Back Sight (Reverse Sight), from a distant mark clearly visible from the rig floor 
+through the Sighting Scope oriented and attached to the Survey Tool in line with the internal Gyro Compass 
+Reference. This Land Sight Mark was on occasion provided by the client, using the land survey company 
+responsible for locating the rig but was often determined by the well survey company, using conventional land 
+survey techniques and a Magnetic Brunton Compass. For low angle wells the gyro reference was then set to the 
+Grid or True North orientation (dependent on the client requirements). 
+ 
+
+===== PAGE 62 =====
+P a g e | 62 
+ 
+For offshore locations this observed and required Sight Reference had either to be pre-established (for each Slot 
+Position) relative to Platform Centre or calculated using distant installations or features visible from the rig floor 
+rotary. If/when no feature was visible from the rig floor the Sight Orientation Reference would be transferred 
+from a position external to the rig floor (e.g. Helideck). 
+ 
+These techniques were also applicable to semi-submersible (floating) installations, with the added complication 
+that the sight reference value might be subject to small but constant change. As a last resort the rigs Ships 
+Compass Heading value would be used. This mobile condition had implications for both the start and end 
+reference for the survey and its effect on Drift Curve closure and survey reference accuracy. 
+ 
+When setting the Gyro Orientation Reference for higher inclination surveys the gyro would be set with the spin 
+axis perpendicular (oriented across) to the wellbore path, with due account taken of the expected gyro drift rate 
+and any change in the wellbore azimuth trajectory. Setting the spin axis in this attitude, provides the most stable 
+orientation for gyro operation as the gimbals tilt with inclination and reduces the potential for Gimbal Lock 
+(System Bearing Jam) and subsequent gyro spin out and survey miss-run. The offset reference orientation value 
+(relative to True or Grid North) applied in this technique was accounted and corrected for by applying a baseline 
+shift to the calculated Drift Curve. 
+ 
+9.5.2 Gyro Drift – Precession Correction 
+The vast majority of gyro surveying performed for the industry, even today, still utilises rotor systems. A spinning 
+gyro rotor tends to keep its axis pointing in the same direction. This is called Gyro Rigidity. If a force is applied 
+which tends to change the direction of the spin axis, the axis will move at right angles to the direction of the 
+applied force. If the spin axis is horizontal and you try to tilt it, the axis will turn. If the axis is horizontal and you 
+try to turn it, the spin axis will tilt. This second characteristic of a gyro is called Precession. 
+ 
+In normal operational use, conditions such as bearing wear, Temperature Coefficients of Expansion (Inertial Mass 
+Distribution – C of G) and System Attitude Change (related to a given well profile) all interact to generate a net 
+force which acting on the Gyro Spin Axis cause the gyro to precess (drift from its initial orientation reference). 
+ 
+The gyro precession experienced during a survey has historically been corrected with a Drift Curve constructed 
+with drift data samples recorded during the in-run and outrun survey. The frequency and duration of drift checks 
+has tended to change over time but the basic premise has always been to take samples related to time, attitude 
+change and temperature (particularly for deeper, hotter surveys). Drift checks were normally taken at least every 
+15 minutes, for a sample duration of 5 minutes with film systems. However, with the introduction of later Vernier 
+scale readings, SRG and digital data, sampling criteria tended to change to 10 minute intervals with 3 minute 
+sample duration. 
+ 
+Drift Checks during the survey were no longer relevant or required with the advent of earlier discreet sampling 
+North Seeking Systems (more later). However, they are beneficial and recommended when operating the current 
+North Seeking Systems in continuous Dynamic Mode where the individual or calculated survey sample stations 
+are not determined by discreet north seek sensing. 
+ 
+The drift correction data is then either applied on its own or as a super set to the Gyro Calibration Model (current 
+systems). The calculated real-time drift correction curve is tied and closed to the start and end reference data, be 
+it a sight observation or north seek reference as in current technology systems. 
+ 
+9.5.3 True Centre Correction (or Offset Centre Correction) 
+From an early stage it was recognised that a gyro survey tool had inherent misalignments associated with the 
+modular structure of the Instrument Stack and more particularly the vane type centralization (Weatherford) 
+which was universally adopted for running in both open and cased hole. These centralizers were not a precision 
+piece of manufactured equipment and variants of this centralizer design, all be it with improved centralization 
+

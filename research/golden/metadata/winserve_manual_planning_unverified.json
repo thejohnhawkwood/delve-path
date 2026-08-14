@@ -1,0 +1,92 @@
+{
+  "fixture_id": "winserve_manual_planning_wsdoc",
+  "level": 2,
+  "software": "WinSERVE",
+  "source_document": "research/winserve/164952996-WSdoc.pdf",
+  "source_url": "https://www.scribd.com/document/164952996/WSdoc",
+  "source_pages": "68-71",
+  "sha256_source": "a24ade40fd7f4ed56d6378df017ca1a555a54f6abeff7b1dd57826c89eb97d29",
+  "verification_status": "verified_wsdoc_pp68_71",
+  "verification_notes": "Numbers read from user-supplied WSdoc 2026-08-13. 3-D slant E/W is -22.67 (prompt had +22.67). These are well-plan constructor exercises, not survey-reconstruction goldens.",
+  "do_not_implement_in_survey_engine": true,
+  "cases": [
+    {
+      "id": "2d_slant_A",
+      "target": { "tvd_ft": 4500, "direction_deg": 45, "displacement_ft": 1000 },
+      "known": { "kop_ft": 650, "dls_deg_per_100ft": 3 },
+      "solve": "hold_angle_deg",
+      "expected": 15.57
+    },
+    {
+      "id": "2d_slant_B",
+      "target": { "tvd_ft": 4500, "direction_deg": 45, "displacement_ft": 1000 },
+      "known": { "hold_angle_deg": 25, "kop_ft": 650 },
+      "solve": "dls_deg_per_100ft",
+      "expected": 0.7448
+    },
+    {
+      "id": "2d_slant_C",
+      "target": { "tvd_ft": 4500, "direction_deg": 45, "displacement_ft": 1000 },
+      "known": { "hold_angle_deg": 25, "dls_deg_per_100ft": 3 },
+      "solve": "kop_ft",
+      "expected": 1932.1
+    },
+    {
+      "id": "3d_slant_tie_in",
+      "tie_in": {
+        "md_ft": 1500,
+        "incl_deg": 2,
+        "azi_deg": 300,
+        "tvd_ft": 1499.7,
+        "ns_ft": 13.09,
+        "ew_ft": -22.67
+      },
+      "note": "Fixing DLS=3 and Hold=25 is called mathematically impossible. Solving Hold prints 20.98.",
+      "solve": "hold_angle_deg",
+      "expected": 20.98
+    },
+    {
+      "id": "2d_swell_hold",
+      "target": { "tvd_ft": 4500, "direction_deg": 45, "displacement_ft": 1000 },
+      "known": {
+        "kop_ft": 1000,
+        "dls1_deg_per_100ft": 2,
+        "dls2_deg_per_100ft": 1.5,
+        "entry_angle_deg": 7
+      },
+      "solve": "hold_angle_deg_and_tangent",
+      "expected_hold_angle_deg": 20.431,
+      "expected_tangent_ft": 1741.65
+    },
+    {
+      "id": "2d_swell_kop2000",
+      "known": {
+        "kop_ft": 2000,
+        "dls1_deg_per_100ft": 2,
+        "dls2_deg_per_100ft": 1.5,
+        "entry_angle_deg": 7
+      },
+      "note": "Cannot hit target TVD; matches VS displacement instead.",
+      "expected_bhl_tvd_ft": 5097.06,
+      "expected_tangent_ft": 0
+    },
+    {
+      "id": "2d_swell_hold24",
+      "known": { "hold_angle_deg": 24, "dls1_deg_per_100ft": 2, "dls2_deg_per_100ft": 1.5, "entry_angle_deg": 7 },
+      "solve": "kop_ft",
+      "expected": 1234.7
+    },
+    {
+      "id": "2d_swell_equal_dls",
+      "solve": "dls1_eq_dls2",
+      "expected": 1.7987
+    },
+    {
+      "id": "2d_swell_tangent1000",
+      "known": { "tangent_ft": 1000 },
+      "solve": "kop_and_hold",
+      "expected_kop_ft": 1434.4,
+      "expected_hold_angle_deg": 26.0523
+    }
+  ]
+}

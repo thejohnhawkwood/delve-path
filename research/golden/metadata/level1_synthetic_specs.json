@@ -1,0 +1,60 @@
+{
+  "level": 1,
+  "note": "Specifications only. No computed expected tables. Mining import omitted until conversion is sourced.",
+  "cases": [
+    {
+      "id": "L1_vertical",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "INC=0, AZI arbitrary, two or more MD steps",
+      "expect": "ns=0, ew=0, delta_tvd=delta_md"
+    },
+    {
+      "id": "L1_due_north",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "constant INC>0, AZI=0",
+      "expect": "ew approximately 0"
+    },
+    {
+      "id": "L1_due_east",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "constant INC>0, AZI=90",
+      "expect": "ns approximately 0"
+    },
+    {
+      "id": "L1_azimuth_wrap",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "AZI 359 then 1 at modest INC",
+      "expect": "small dogleg; must not behave as a 358 degree turn"
+    },
+    {
+      "id": "L1_near_zero_dogleg",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "nearly identical INC/AZI",
+      "expect": "ratio factor approaches 1; finite position increment"
+    },
+    {
+      "id": "L1_cross_horizontal",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "INC passes through 90",
+      "expect": "TVD increment changes sign correctly around 90"
+    },
+    {
+      "id": "L1_vsp_independence",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "identical surveys, two VSP values",
+      "expect": "N/E/TVD unchanged; VS changes"
+    },
+    {
+      "id": "L1_unit_equivalence",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "same trajectory in ft deg/100ft and m deg/30m",
+      "expect": "positions agree after conversion"
+    },
+    {
+      "id": "L1_tie_in",
+      "convention": "oilfield_inc_from_vertical",
+      "stations": "non-zero MD TVD N E INC AZI start",
+      "expect": "accumulation from that origin"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "fixture_id": "nm_3000564295_klondike_1h_sidetrack_excerpt",
+  "level": 3,
+  "status": "NOT YET VALIDATED vs delve-core. Short public excerpt only. NOT a dual-lateral (pilot hole + sidetrack Wellbore #2).",
+  "software": "COMPASS 5000.1 Build 74",
+  "calculation_method": "Minimum Curvature",
+  "source_url": "https://ocdimage.emnrd.nm.gov/imaging/filestore/Artesia/WF/311794/30005642950000_11_WF.pdf",
+  "source_page": "1–5",
+  "api": "30-005-64295",
+  "operator": "Mack Energy",
+  "lease_well": "Klondike State Com #1H",
+  "location": "Sec 23 T15S R28E, Chaves County, New Mexico",
+  "survey_company": "Integrity Directional Services",
+  "report_date": "2017-09-23",
+  "units": "usft",
+  "north_reference": "Grid",
+  "wellbores": [
+    { "name": "Pilot Hole", "survey": "Survey #1 (Pilot Hole)", "from_md_ft": 181, "to_md_ft": 2146 },
+    { "name": "Wellbore #2", "survey": "Survey #1 (Wellbore #2)", "from_md_ft": 2239, "to_md_ft": 8940, "tie_on_md_ft": 2146 }
+  ],
+  "input_csv": "research/golden/fixtures/nm_3000564295_klondike_1h_sidetrack_excerpt.csv",
+  "transcription_notes": "Key stations only, from the public COMPASS Standard Survey Report. Pilot-hole body was not transcribed. Last two rows include a projection to PTB — exclude from measured-survey tests. Printed rounded values are not infinite-precision truth.",
+  "redistribution": "public NM OCD filing"
+}

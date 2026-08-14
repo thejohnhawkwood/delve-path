@@ -1,0 +1,17 @@
+DelvePath — evaluation prototype
+Mithril Consulting
+
+NOT CERTIFIED. Not regulator-approved. Not for collision avoidance, well control,
+or steering. Minimum Curvature (ISCWSA). Not claimed bit-identical to WinSERVE.
+
+This build opens with a public Oregon WinSERVE survey (24c-23-65, feet,
+VSP 165.30°, tie-in MD = TVD = 445 ft). Click Start here for a short tour.
+Uncheck Tips to turn off term mouseovers.
+
+New / Open uses a local *.delvepath file on this machine. No cloud, no login.
+
+Install: run the NSIS installer. WebView2 may be installed locally by the
+offline installer if Windows does not already have it.
+
+Do not treat plotted targets (e.g. “Big Sand”) as part of the Oregon filing.
+That target is a demo point only.

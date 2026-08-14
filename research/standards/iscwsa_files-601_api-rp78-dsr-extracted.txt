@@ -1,0 +1,206 @@
+Directional Survey Records (DSR)
+ETING
+Scope
+Directional Survey Records relates to establishing a set of recommend practices to ensure important directional survey records are properly managed, documented, and retained at the end of the surveying process and through the well life cycle. This includes all documents such as individual trajectory surveys, reference information and composite directional surveys.
+The scope of DSR include all forms of digital and hard-copy survey records including but not limited to individual survey reports, header information, final actual (composite) survey program, instrument calibration records, job activity logs, associated correction values, survey instrument conveyance (running) information and other related relevant information deemed to be prudent to archive with the trajectory position record.
+The DSR refers to a trajectory data record for a wellbore that includes the data itself, the associated survey information, and the physical and digital records including the data archived in a database, in file folders and within digital document management systems. The intent is to provide general recommended practices not intended to conflict with any local, state or federal regulations related to borehole surveys or associated records.
+Survey Information Archive
+Survey Station Data (MD / INC / AZIM)
+The primary survey station data set includes Measured Depth, Inclination, and Azimuth. There are two basic forms of well survey azimuth and the data shall include a distinct north reference to indicate true or grid. For example, AZIM-T or AZIM-G may be used in the azimuth column header clearly stating the north reference. Grid azimuth surveys should also include a reference to the CRS (EPSG code (see Surface Coordinates).
+Calculated Station Data
+Calculated survey station data refers to basic and advanced calculated data columns. Depending on the type of survey report, additional non-basic data columns can be added as required. The columns consist of both basic data and advanced data including but not limited to the following:
+Basic Calculated Data Columns
+Advanced Calculated Data Columns (Additional)
+TVD [ft], True Vertical Depth from the ZMDE Reference
+Build Rate [°/100ft], + Build / - Drop
++N/-S  [ft], Latitude or Local North/South Distance
+Turn Rate [°/100ft], + Right / - Left (Walk Rate)
++E/-W  [ft], Departure or Local East/West Distance
+TVDss [ft], True Vertical Depth from MSL or LAT
+Vertical Section [ft], Based on a Vertical Section Azimuth
+Course Length [ft], Distance Between Survey Stations
+DLS [°/100ft], Dogleg Severity
+Tortuosity, [°/ft2], [DLS/ft] Change in DLS per Unit Length
+Survey Type (i.e., Gyro, Magnetic, Projection)
+Closure Distance [ft], Total Displacement
+Survey Tool Code (i.e. OWSG Tool Identification Code)
+Closure Azimuth [°], Origin to Closure Distance Point
+Comments (As Required)
+Cumulative Tortuosity and Cumulative Dogleg Severity
+Survey Quality Checks (Btotal, Dip Angle, Gtotal, etc.)
+All other calculated data sets
+Raw Sensor Data
+Actual raw sensor values from magnetometers and accelerometers are an important part of the directional survey record and shall be included in the final record of the survey provided to the Operator. The common format of the survey raw sensor data is Bx, By, Bz, Ax, Ay, Az where one of the three values refer to the along-hole axial direction and the other two values refer to cross-axial components. In some cases, magnetometer data will be in the form of Hx, Hy and Hz and accelerometer is recorded as Gx, Gy and Gz and. In either case, the units should be clearly defined and the axial component is to be identified so it is not to be confused with the cross-axial values.
+Tie-On Points
+Tie-on points for surveys within the same wellbore shall be the last accepted survey station and not the projection. In the event of a sidetrack, the tie-on point may be the last station above the kick-off depth. An interpolated survey point at the kick-off depth based on the parent wellbore should be entered as the second survey station of the sidetrack borehole and labelled as the kick-off depth in the database. Wells with a whipstock can define the kick-off depth as the top of the window.
+When an interpolated point is required, the interpolated point should be calculated utilizing the minimum curvature equation and the same error model code as the surrounding points with a distance between points of ˂300 ft (100 m) in a tangent section and 100 ft (30 m) in a curve. In the event that there are two different tool types, the more conservative error model code may be chosen. Interpolated survey stations used in the CDS shall be clearly identified as either inclination, azimuth or combined inclination and azimuth interpolations.
+In the event of magnetic interference at a sidetrack point, it is acceptable to use the survey inclination and interpolate the azimuth up to 500 ft (150 m) using the appropriate error model code, (e.g., an error model code that represents an interpolated azimuth with a MWD inclination). However, when another well other than the parent well is within a close proximity another survey method should be considered. See the collision avoidance section for more information.
+The parent well and the sidetrack originating from the parent well should have zero relative uncertainty at the sidetrack kick-off point and only accumulate relative uncertainty from the parent well, this relative uncertainty should be used for assessment of collision risk with the parent wellbore only. If the target position is also relative to the parent well penetration, the same allowances can be applied for creating the drillers target (e.g., wells drilled as a replacement for a completion failure). Relief well objectives, other targeting requirements, and collision risks with offset wells not directly tied to the sidetrack borehole should be evaluated with the uncertainty originating from the point of deepest constraint (e.g., wellhead).
+Projections to Total Depth
+A bottom-hole projection to the total depth drilled, commonly called “Projection to TD,” should be clearly identified in the survey report. Projections to TD will typically be a straight-line projection using the total measured depth drilled with the last valid survey inclination and azimuth. However, if the well is steered or has aggressive directional tendencies, the final projection can be a projected inclination and azimuth based on the steered interval or based on the known directional trend. Directional build-rate and walk-rate tendencies used for projections may be either the trend over several survey stations or the trend over the last non-steered section.
+Survey Tool Types
+Survey data shall be entered as lines of measured depth, inclination, and azimuth with an associated error model reference (tool code). The survey tool type identified by the OWSG or similar tool code list shall be documented for each survey station to ensure the type of survey instrument, reference models used (if applicable); corrections applied (if applicable) are identified for every survey station recorded. In addition, non-accepted surveys such as check-shots, interpolations, projections, etc. shall be clearly identified in the survey station data set. A recommended practice is to use an industry standard set of instrument performance tool code error models, such as the comprehensive OWSG tool codes (Set A and Set B). Consistent tool codes should be added to all digital records where important aspects of the survey, conversion references, and corrections applied are clearly identified. A list of the Standard (Set A) and Extended (Set B) tool codes can be found on the following website; //www.copsegrove.com/Pages/OWSGSurveyToolErrorModels.aspx.
+Composite Directional Survey
+A Composite Directional Survey (CDS) is used to create the most recent best-known position of the well and shall be clearly identified as such. This is commonly called a definitive CDS. During the life cycle of a well new or improved borehole trajectory data may become available. In some cases, improved azimuth reference models (HRGM, IFR1, IFR2, etc) are used. Another case involves a more advanced survey correction (SAG, AX, MSA, etc) not originally employed that is later applied to existing archived directional data. In either case, an opportunity is presented to create a new definitive CDS, which will be a new final survey record for a well. The new CDS record becomes the primary composite trajectory positional data set for all future analysis, modeling, and comparisons. Maintaining consistency in the CRS, datum elevation references and azimuth reference are important when combining new surveys and future survey enhancements. Appropriate adjustments and corrections are to be applied with a consistent set of reference values when surveys having different references (coordinate reference system, north reference, elevation reference, slot-offset reference, etc) are combined. For example, if a new surface and intermediate section gyro survey is run during a well servicing event it will need to use consistent references. If the new survey was processed with a different azimuth reference and ZMDE (Zero Measured Depth Elevation), the survey should be adjusted back to the original drilling ZMDE and azimuth reference. This will ensure the tie-in point used between the new survey and the remaining archived surveys are properly joined to create a new CDS void of gross error. A good practice is to use the final drilling ZMDE so future use of the CDS will be referenced to the original elevation used in the construction and completion phase of the well life cycle. In addition, any future cased-hole or open-hole logs that are run should keep the same ZMDE to ensure the logs are properly referenced when combining the log data with trajectory data ensuring a final set of data that is spatially correct. All adjustments are to be clearly documented.
+Reporting and data management
+All supporting survey data for current or future survey corrections should be submitted with the final survey report to be stored in the database.
+The survey/directional data required for end of well (EOW) reports from the survey provider is divided into three
+General survey data
+Survey tool type data
+Deployment technique data
+Survey Header and Composite Data
+( Repeated in Database Section)
+The following data shall be included in all survey EOW
+UWI (US Number (API), PPDM) (See Surface Coordinates / WRP or Well Origin)
+Well Common and Legal Name (See Surface Coordinates / WRP or Well Origin)
+CRS and units (using a specific EPSG Code, see API-RP78 Surface Coordinates)
+Field name
+Date
+Azimuth North Reference
+Wellhead coordinates
+ZMDE (Zero Measured Depth Elevation)
+Elevation reference description (DFE, RKB, GL, ML, ETC)
+Depth of deepest constraint
+Tie-in-point
+Projection to total depth
+Casing/hole size(s) and depth(s)
+Grid convergence, declination (geomagnetic reference model, elevation and calculation date), and total correction (definition in wording and pictorially)
+Error model code(s) assigned and associated depth range(s)
+Basic Survey Tool and Run Information
+The following minimum data shall be required as a function of tool type and deployment method. A distinction is made between magnetic and gyroscopic survey tools.
+Magnetic Survey Tool Information
+For each run or BHA, the following additional data should be reported in the survey
+General Job Information
+Personnel names
+Run number, tool type, name, service provider, tool serial number
+Pre‐ and post‐job calibration check data including field roll tests
+Sequence of events, equipment used, BHA, instrument spacing details, etc.
+For conventional magnetic survey tools (Camera Based Magnetic Single-Shot/Multi-Shot):
+Angle unit type and range
+Sensor spacing details within the non-magnetic BHA components
+Temperature data by station if available
+Deployment method (e.g., wireline and if stretch and temperature depth corrections are applied, dropped, while drilling)
+Depth calculations for a dropped multi-shot survey while tripping
+Corrections applied
+Comparison of tandem instrument surveys, if applicable
+Any additional survey quality control checks or QC parameters used not listed above
+For solid-state electronic magnetic survey tools (MWD, EMS, Dipmeter, etc.):
+Uncorrected (but calibration corrected) and corrected (if applicable) accelerometer and magnetometer axis data with a date and depth for all survey stations taken (including check shots and roll tests) for solid-state magnetic tools and tri-axial accelerometers
+Temperature data by station
+Deployment method (e.g., wireline and if stretch and temperature depth corrections are applied, dropped, while drilling)
+Earth's magnetic reference field data used and its source (i.e., BGGM, HRGM (HDGM or MVHD) , IFR) noted on a station level
+The calculated reference field data for each station and variation from the reference data for both uncorrected and corrected data (time dependent magnetic field reference data (declination and dip angle) shall include the geomagnetic reference model, elevation, and calculation date.
+If corrected axis data is provided, the type of correction and recomputed reference data should be included
+Depth corrections, if performed, with the temperature and stress distribution along the drillstring. All drillstring components should be included with a clear description.
+The stations included to perform the multi-station analysis if multi-station analysis corrections were applied
+Any additional survey quality control checks or QC parameters used not listed above
+Gyroscopic Survey Tool Information
+For each run or BHA, the following additional data should be reported in the survey
+General Job Information
+Personnel names
+Run number, tool type, name, service provider, tool serial number
+Pre‐ and post‐job calibration check data
+Sequence of events, equipment used, BHA, instrument spacing details, etc.
+For conventional gyroscopic survey
+Temperature data by station if available
+Angle unit type and range
+Foresight reference used (position and angle)
+Drift checks and drift rates (total observed and calculated)
+Closure rate
+In-run/out-run inclination and azimuth difference
+Wireline depth closure
+Corrections applied (drift, tilt, inter‐gimbal, foresight offset, toolface center correction)
+Pre/post calibration data roll test pre/post job
+Any additional survey quality control checks or QC parameters used not listed above
+For north seeking gyro tools (including GWD)
+Type of tool used
+Operating mode (gyro compassing or continuous mode)
+If the tool foresight was referenced, the foresight reference used (position and angle)
+Temperature data by station
+Pre/post calibration data
+Roll test pre/post job
+If continuous mode, survey duration time and drift check data
+Any additional survey quality control checks or QC parameters used not listed above
+Survey Conveyance and Capture Technique Information
+The technique data comprise how the tool was run (e.g., wireline, wireline steering gyro, drilling etc.). The following data on the technique applied should be reported in the survey
+Wireline deployed
+Wireline depth closure
+Wireline depth correction applied
+Running gear (e.g., centralizers, including size, type, and placement)
+Wireline steering
+BHA data, including sensor spacing
+Toolface center offset correction applied
+MWD
+All BHA survey offsets
+Toolface center offset correction applied
+Non-magnetic spacing used
+Motor bend or bent sub-angle and distance to bend from the bottom of the tool
+Tool types (e.g., drill collar, stabilizer, MWD collar, resistivity collar, non-magnetic spacing)
+Weight per foot of each item
+Internal and external diameters
+Tool upsets (e.g., wear bands and stabilizer blades)
+For proprietary tools (e.g., a resistivity tool) a stiffness factor associated with the tool and the reference dimensions (this stiffness factor is the adjustment of the different in moment in inertia due to a non-cylindrical bore filled with electronics and other components)
+Slide / RSS Steering Sheets
+Records
+Post-Job Summary Records
+A summary of the drilling operations for any well shall be distributed to the operating company. As a minimum, the components of an end of well summary report should
+Final Directional Plan
+Directional Survey Report
+Individual Survey Report
+Composite Survey Reports if applicable, a final well trajectory report using multiple surveys
+Plan vs. Actual Trajectory Graphs
+General Well
+Legal well name
+Field name
+Date
+Geodetics/Geomagnetic
+CRS and units (using a specific EPSG Code, see API-RP78 Surface Coordinates)
+Wellhead coordinates
+Elevation and elevation reference
+Grid convergence, declination, and total correction
+Definition in wording and pictorially
+Declination to include the geomagnetic reference model, elevation and calculation date as a minimum
+Measurements
+Depth of deepest constraint
+Tie-in-point
+Projection to total depth
+Casing/hole size(s) and depth(s)
+Error model code(s) assigned and associated depth range(s)
+Job Activity Reports (Directional and/or Measurement Service provider) may include but not limited
+Bit / BHA Run Summary
+Drilling Parameters
+Slide Sheets
+Wireline Report
+Survey Instrument (Memory or Wireline) Report
+Regulatory Files and Requirements
+At the end of drilling operations of a well, if required, a compilation of documents that evidence the final wellbore position shall be submitted by the service provider to the applicable regulatory agencies. In some cases, the Operator is required to submit the final survey records. For the case of a service provider submitting the documents, a copy of these documents shall be distributed to the operating company.
+Single Directional Survey Run  every directional survey service provider shall submit the final survey report of the performed survey run.
+Composite Directional Survey  if applicable, every directional survey service provider shall submit the final survey report of the performed survey from surface to the total depth of their last survey with a projection if the last survey is at total depth (TD).
+Annotated PLATs (Pad, Platform, or Wellsite Survey Drawings): or updated PLATs with final surface and bottom-hole location shall be submitted to the applicable regulatory agency by the surveyor company.
+Certification  every directional survey company provider shall certify the data recorded in the survey run report and submit it to the applicable regulatory agency.
+Regulatory bottom-hole location PLAT certifications should be annotated by the licensed land surveyor who is listed as the author of the Plat Drawing.
+Digital records
+Directional survey records provided in a digital format shall follow a recognized format such as the digital record format developed by the IOGP task force. The latest version of the IOGP P7-17 (www.iogp.org/Portals/0/Geomatics/P7.pdf) Well Bore Survey Data exchange format should be used when providing directional surveys between parties as a part of the digital record. This format should provide a composite final definitive survey i.e. concatenated well path and should include raw sensor measurement data.
+LAS,ASCII, (CSV - Data Table), PDF  (  Excel should not be considered as a final digital survey record)
+Database (See the Database Section of this RP)
+WITSML Digital Data Records- WITSML, mnemonics should conform to the most recently published Energistics pre-defined record types; an example of which can be found
+www.energistics.org/
+Mnemonics for data transmission shall be agreed upon between Company and Contractor for consistency.
+Electronic Document Management System (EDMS) - An EDMS is recommended when archiving well records as opposed to using unstructured shared-drive data folders.  An EDMS is a software program that manages the creation, storage and control of documents electronically.  The primary function of an EDMS is to manage electronic information within an organization’s workflow.   A basic EDMS should include document management, workflow, text retrieval, and imaging.  Not all EDMSs have records management capability.  To qualify as a records management system, an EDMS should be capable of providing secure access, maintaining the context, and executing disposition instructions for all records in the system.  Before implementing a system you should determine how it fits into your overall records management strategy.  EDMS functionality is often integrated into Content Management (CM) systems.  These systems combine additional functionality such as website management with workflow tools, standard templates and access rights.
+Hard Copy – Recommendations for paper “hard-copy” records. The Operator or Supplier survey record archives group are responsible not only for collecting, interpreting, and exhibiting significant materials that document history, but also for the long-term preservation, security, and accessibility of these materials. A records department should insure that the collections in its custody are protected, secure, unencumbered, cared for, and preserved.
+Preservation is an integral part of record keeping and preservation planning should be part of its overall strategic plan.
+Preservation planning is a process by which the general and specific needs for the care of collections are determined, priorities are established, and resources for implementation are identified. Its main purpose is to define a course of action that will allow an institution to set its present and future preservation agendas. In addition, it identifies the actions an institution will take and those it probably will never take so that resources can be allocated appropriately.
+Temperature, Relative Humidity, Light and Air Quality are basic elements of a Preservation Plan. Control of temperature and relative humidity is critical in the preservation of records and archival collections because unacceptable levels of these contribute significantly to the breakdown of materials. Heat accelerates  the rate of most chemical reactions, including deterioration, increases considerably as temperature increases. In addition, high relative humidity provides the moisture necessary to promote harmful chemical reactions in materials and, in combination with high temperature, encourages mold growth and insect activity. Extremely low relative humidity, which can occur in winter in centrally heated buildings, may lead to desiccation and embrittlement of some materials.
+Operator Records Retention
+A Record’s legal, regulatory, business, or historical significance make it subject to formal recordkeeping requirements. Works in progress, copies, and drafts are not Records unless specifically required for legal or contractual reasons. All DSR documents are subject to a RRS. The primary well Operator should retain ownership of the borehole trajectory DSR documents for all wells unless the ownership is divested to another Operator.
+When oil and gas assets are divested all DSR documents should be transferred to the new Operator including but not limited to hard copies, tape backups, electronic media, large plots, diskettes, CD-ROMs, USB thumb-drives, external hard-drives and any other form of a DSR.
+Service Provider Records Retention
+Records are established to provide evidence of conformity to requirements of the effective operation of the quality management system. These records should be controlled and the records should conform to the requirements outlined in the latest edition of the Specification for Quality Program for the Petroleum, Petrochemical, and Natural Gas Industry (ANSI/API SPECIFICATION Q1) or similar standard such as ISO TS 2007. This includes but is not limited to records related to the following:
+Original Equipment Manufacturer (OEM) Tool Certifications
+Calibration and Maintenance records
+Surveyor Training Records and Competency
+When the surveying company, service provider, DSR document retention period expires the original Operator or current well Operator should be notified before records are permanently destroyed to provide an opportunity to the current well Operator to take ownership of the survey records. It is recommended that an Operator take ownership of all DSR documents to ensure important positional data, references, and information are retained by the Operator rather than disposal of records deemed to be obsolete or out of date by the service provider. All DSRs retained by the surveying company are subject to audit at any time and should be maintained according to agreed retention requirements. Any records under conflict or investigation should be retained beyond the agreed retention period unit a resolution has been confirmed and the records are released from conflict investigation hold status. Any such copies may be disposed of at the discretion of the services company provided the original records, forms, and documents have been on file with both the Operator and regulatory agency for the required period and so long as all the required information has been properly submitted to both parties. Records that have not been adequately reported should not be disposed.
+Definitions
+Directional Survey Record (DSR) - Information, regardless of media or format, which documents a business transaction, decision or event which is required to be retained according to the Records Retention Schedule (RRS).
+Record Retention Schedule (RRS) -   A list of categories of Records that shows the approved retention period and other attributes of such Records. The RRS may not list every specific document that is a Record.
+Composite Directional Survey (CDS) - A directional survey record relates to a combined survey report that includes surveys taken from one or more instruments belonging to the same or different service provider at different phases of the well life cycle.

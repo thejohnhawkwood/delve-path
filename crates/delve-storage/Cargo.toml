@@ -1,0 +1,11 @@
+[package]
+name = "delve-storage"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+delve-core.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+uuid.workspace = true

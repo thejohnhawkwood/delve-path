@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/delve-core", "crates/delve-storage", "src-tauri"]
+
+[workspace.package]
+edition = "2021"
+license = "LicenseRef-Proprietary"
+authors = ["Mithril Consulting"]
+
+[workspace.dependencies]
+delve-core = { path = "crates/delve-core" }
+delve-storage = { path = "crates/delve-storage" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+csv = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }

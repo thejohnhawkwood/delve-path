@@ -1,0 +1,29 @@
+{
+  "fixture_id": "synthetic_dual_lateral",
+  "level": 1,
+  "status": "SYNTHETIC / constructed / NOT a golden as-drilled match",
+  "validation": "WORKING — positions computed with the same Minimum Curvature RF as delve-core; not compared to a filed survey",
+  "software": "DelvePath constructed example",
+  "calculation_method": "Minimum Curvature",
+  "units": "ft",
+  "convention": "oilfield_from_vertical",
+  "vertical_section_plane_deg": 90,
+  "geometric_character": "One vertical parent wellbore, land east (AZI 90), hold to TD. Lateral B kicks off at the selected parent station MD 6500 ft (still vertical), builds opposite (AZI 270), hold to TD.",
+  "branch": {
+    "parent_hole": "Parent wellbore",
+    "sidetrack": "Lateral B",
+    "kick_off_md_ft": 6500,
+    "kick_off_rule": "Selected measured station as KOP. Arbitrary-MD interpolation is not implemented (DSR would add an interpolated min-curvature station at kick-off)."
+  },
+  "targets": [
+    { "hole": "Parent wellbore", "name": "East BHL", "north_ft": 0, "east_ft": 3954.93, "tvd_ft": 7454.93 },
+    { "hole": "Lateral B", "name": "West BHL", "north_ft": 0, "east_ft": -3954.93, "tvd_ft": 7454.93 },
+    { "hole": "Parent wellbore", "name": "Junction", "north_ft": 0, "east_ft": 0, "tvd_ft": 6500 }
+  ],
+  "input_csv": [
+    "research/golden/fixtures/synthetic_dual_lateral_parent.csv",
+    "research/golden/fixtures/synthetic_dual_lateral_lateral_b.csv"
+  ],
+  "expected_csv": "research/golden/fixtures/synthetic_dual_lateral_expected_positions.csv",
+  "do_not": "Do not add this fixture to delve-core golden tests. It is a UI/demo construct."
+}

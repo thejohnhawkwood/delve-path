@@ -1,0 +1,33 @@
+{
+  "fixture_id": "hawkeye_idaho_fallon1-10_survey_excerpt",
+  "level": 3,
+  "software": "HawkEye (PDT); report branded John M. Phillips / JMP",
+  "calculation_method": "not printed on the excerpted page; HawkEye product uses Minimum Curvature — do not assume without the report header",
+  "record_type": "as_drilled_survey_excerpt",
+  "source_document": "research/golden/source-pdfs/hawkeye_idaho_Fallon1-10_DIR_20180218.pdf",
+  "source_url": "https://ogcc.idaho.gov/wp-content/uploads/1107520032_Fallon1-10_DIR_20180218_PTS.pdf",
+  "source_page": 4,
+  "sha256_source": "349F15D15548D6CAAFDCFE91C614D140849BECBCC87A8FAC478B979C611C0D7D",
+  "api": "11-075-20032",
+  "well": "Fallon 1-10",
+  "job_number": "201708JMP-PGD-01",
+  "units": "ft / US ft",
+  "geodetic_group": "US State Plane 1927 (Exact solution)",
+  "geodetic_zone": "Idaho West 1103",
+  "datum": "NAD27 / CLARKE 1866",
+  "magnetic_model": "C:\\HawkEye\\IGRF2015.MIF",
+  "magnetic_declination_deg": 13.67,
+  "grid_convergence_deg": -0.82,
+  "total_correction_mag_to_grid_deg": 14.49,
+  "input_precision": "MD 2 dp; INC/AZI 2 dp",
+  "output_precision": "TVD/N/E/VS 2 dp; DLS 2 dp; map N/E 2 dp",
+  "columns_present": ["MD", "INC", "AZM", "TVD", "NS", "EW", "VS", "Closure Dir", "DLS", "Northing", "Easting"],
+  "targets": [
+    { "name": "Fallon 1-10 Target", "shape": "CYLINDER", "tvd_ft": 3374.0, "ns_ft": -1005.0, "ew_ft": -426.0, "diameter_ft": 100.0 },
+    { "name": "Payette Target", "shape": "CYLINDER", "tvd_ft": 5000.0, "ns_ft": -1580.0, "ew_ft": -669.7, "diameter_ft": 100.0 }
+  ],
+  "transcription_method": "RapidOCR on 2x render of page 4 (page labelled Page #2 Wellpath: Fallon 1-10 Survey)",
+  "transcription_verified": true,
+  "verification_notes": "Excerpt of a drop/hold section (INC 25.4° down to 10.1° then 11.8°). Earlier stations exist on prior pages and were not fully transcribed. Cover page stamped CONFIDENTIAL — this is a public Idaho OGCC filing. Method name not on this page. Printed rounding is the tolerance floor.",
+  "csv": "research/golden/fixtures/hawkeye_idaho_fallon1-10_survey_page4.csv"
+}

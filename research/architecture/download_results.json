@@ -1,0 +1,114 @@
+﻿[
+    {
+        "url":  "https://www.oregon.gov/dogami/mlrr/logs/og/IW24C-23-65/boresurvey.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\oregon_IW24C-23-65_boresurvey.pdf",
+        "bytes":  58955,
+        "sha256":  "C50332AF6999695798528E146C7EE482C4C4D8028961F395D9D43C6A55A14D98",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://ocdimage.emnrd.nm.gov/Imaging/FileStore/Aztec/WF/23372/3003929320_5_WF.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\nm_3003929320_5_WF.pdf",
+        "bytes":  204074,
+        "sha256":  "A2A4CB0F6342F813CB5CF9020FC42389712CCD0A1D1DB5BC6E3CF5744A02DB86",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://ocdimage.emnrd.nm.gov/Imaging/FileStore/Aztec/WF/32063/3004532380_7_WF.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\nm_3004532380_7_WF.pdf",
+        "bytes":  224978,
+        "sha256":  "B27F1AAFAE4C9AD38409342B9BCA59AA5E587A67AD665F35BD0FBF82191F365D",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://ocdimage.emnrd.nm.gov/Imaging/FileStore/Aztec/WF/42528/3003929461_13_WF.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\nm_3003929461_13_WF.pdf",
+        "bytes":  160204,
+        "sha256":  "99D325CA81311C45E6E1E5E02D6A5CD685EC490C8A6C3DA41AAF9C2B509BB687",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://ocdimage.emnrd.nm.gov/imaging/filestore/SantaFe/WF/20250812/30015559690000_08_12_2025_04_30_21.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\compass_30015559690000_20250812.pdf",
+        "bytes":  9437003,
+        "sha256":  "70CAE91F6B339D38AB34B085481E4F13B378E3A981A3D0935B80D3442ACF04FE",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://ocdimage.emnrd.nm.gov/imaging/filestore/SantaFe/WF/20251003/30039313630000_10_03_2025_08_47_01.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\compass_30039313630000_20251003.pdf",
+        "bytes":  1533157,
+        "sha256":  "129D21B5BCBFEE883B854BC80B74910876A51E3D0B6A2FA23AAD6278D9810646",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://ogcc.idaho.gov/wp-content/uploads/1107520032_Fallon1-10_DIR_20180218_PTS.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\golden\\source-pdfs\\hawkeye_idaho_Fallon1-10_DIR_20180218.pdf",
+        "bytes":  5444696,
+        "sha256":  "349F15D15548D6CAAFDCFE91C614D140849BECBCC87A8FAC478B979C611C0D7D",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.iscwsa.net/media/files/page/f1c1e97e/introduction-to-wellbore-positioning-ebook-v9-10-2017.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\standards\\iscwsa_introduction-to-wellbore-positioning-ebook-v9-10-2017.pdf",
+        "bytes":  6647105,
+        "sha256":  "254D90E539FC8BFB4A12F574EF12FBA291605224D7402D261CA4E0EC2D73D453",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.iscwsa.net/media/files/files/f40a3625/07-iscwsa43-spe-wpts-daklestad-boreholecalculationmethods-4mar16.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\standards\\iscwsa43_daklestad_boreholecalculationmethods.pdf",
+        "bytes":  2047877,
+        "sha256":  "CC12937578A759DD07242D417A9424336867F52E5A1CEBB991C24FEB6EFE91A5",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.iscwsa.net/media/files/committee/ce60f271/well-intercept-sub-committee-ebook-version-3-2021-.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\standards\\iscwsa_well-intercept-ebook-v3-2021.pdf",
+        "bytes":  10929390,
+        "sha256":  "4ADE32CF2C6546B6F011AA7ED1A99286EE53C060EECD517557DB2D224A939819",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.aer.ca/documents/onestop/directional-survey-file-format.csv",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\regulatory\\alberta-oil-gas\\aer_directional-survey-file-format.csv",
+        "bytes":  20922,
+        "sha256":  "D5BF206E9DA80915BC6C4F79BDDBE467433AF91A3073E58BEF5B4E18E3D2EBA8",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.aer.ca/documents/onestop/directional-survey-file-format.xlsx",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\regulatory\\alberta-oil-gas\\aer_directional-survey-file-format.xlsx",
+        "bytes":  44355,
+        "sha256":  "E1E94C807D0DF0344A89C0C41C82C2EAEBC5474BB80513D8CAC52CDCABD916F8",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.aer.ca/documents/onestop/directional-survey-template-validation-rules.xlsx",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\regulatory\\alberta-oil-gas\\aer_directional-survey-template-validation-rules.xlsx",
+        "bytes":  20768,
+        "sha256":  "242F460C2BBD1B4126810288CF3AA4F860953A2A7C118C890DB4007B8BED0786",
+        "ok":  true,
+        "error":  ""
+    },
+    {
+        "url":  "https://www.aer.ca/documents/onestop/QRG-submitting-directional-survey-data.pdf",
+        "path":  "C:\\Users\\Papa\\Desktop\\delve-path\\research\\regulatory\\alberta-oil-gas\\aer_QRG-submitting-directional-survey-data.pdf",
+        "bytes":  783222,
+        "sha256":  "E9D72271967FEBE75D3FFCAAEFC0D5703A23D36292A7B381B15A80066DD1ECEB",
+        "ok":  true,
+        "error":  ""
+    }
+]

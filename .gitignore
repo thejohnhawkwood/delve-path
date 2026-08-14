@@ -1,0 +1,50 @@
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Historical / proprietary binaries — never commit
+*.exe
+*.msi
+*.dll
+*.sys
+*.com
+*.scr
+*.bat
+*.cmd
+*.ps1.bak
+
+# Temporary extraction artifacts
+research/**/tmp/
+research/**/_tmp*/
+research/_tmp_aer/
+research/**/_extract/
+research/**/_render/
+research/**/_ocr/
+research/**/extracted/
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.iso
+
+# App build artifacts
+node_modules/
+dist/
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+*.log

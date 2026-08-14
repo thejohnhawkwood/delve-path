@@ -1,0 +1,6 @@
+wellbore,md_ft,incl_deg,azi_deg,tvd_ft,north_ft,east_ft,comment
+Wellbore #2,2146.00,0.70,223.50,2145.84,7.81,10.06,tie-on / last station of Survey #1 Pilot Hole (header)
+Wellbore #2,2239.00,0.70,215.40,2238.83,6.94,9.34,1st MWD Survey Wellbore #2
+Wellbore #2,3276.00,90.80,180.90,2890.21,-665.03,-1.11,Landing
+Wellbore #2,8889.00,89.10,181.10,2895.82,-6276.40,2.61,Last MWD Survey
+Wellbore #2,8940.00,89.10,181.10,2896.62,-6327.38,1.63,PTB projection — not a measured station
