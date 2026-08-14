@@ -159,6 +159,43 @@ function csvEscape(s: string): string {
   return s;
 }
 
+export function formatStationTsv(
+  s: MeasuredStation,
+  pos?: { north: number; east: number; tvd: number } | null
+): string {
+  const n = (v: number) => (Number.isFinite(v) ? String(v) : "");
+  return [
+    n(s.md),
+    n(s.inc_deg),
+    n(s.azi_deg),
+    s.comment ?? "",
+    n(pos?.north ?? Number.NaN),
+    n(pos?.east ?? Number.NaN),
+    n(pos?.tvd ?? Number.NaN),
+  ].join("\t");
+}
+
+/** Copied survey row (N/E/TVD in cols 5–7) or three numbers as N, E, TVD. */
+export function parseTargetPaste(text: string): { north: number; east: number; tvd: number } | null {
+  const line = text.replace(/^\uFEFF/, "").split(/\r?\n/).find((l) => l.trim()) ?? "";
+  const raw = (line.includes("\t") ? line.split("\t") : line.includes(",") ? line.split(",") : line.trim().split(/\s+/)).map(
+    (c) => c.trim()
+  );
+  if (raw.length >= 7) {
+    const north = Number(raw[4]);
+    const east = Number(raw[5]);
+    const tvd = Number(raw[6]);
+    if ([north, east, tvd].every(Number.isFinite)) return { north, east, tvd };
+  }
+  if (raw.length === 3) {
+    const north = Number(raw[0]);
+    const east = Number(raw[1]);
+    const tvd = Number(raw[2]);
+    if ([north, east, tvd].every(Number.isFinite)) return { north, east, tvd };
+  }
+  return null;
+}
+
 export function rowsForCalc(rows: MeasuredStation[]): MeasuredStation[] {
   return rows.filter((r) => Number.isFinite(r.md) && Number.isFinite(r.inc_deg) && Number.isFinite(r.azi_deg));
 }

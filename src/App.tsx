@@ -25,7 +25,7 @@ import {
 } from "./api";
 import { Charts, type HoleOverlay } from "./Charts";
 import { asColorInput, COLOR_PRESETS, defaultHoleColor, PARENT_HOLE_COLOR } from "./colors";
-import { asClass, exportCalculatedCsv, measuredOnly, parseSurveyTable } from "./csv";
+import { asClass, exportCalculatedCsv, formatStationTsv, measuredOnly, parseSurveyTable, parseTargetPaste } from "./csv";
 import type {
   AzimuthReference,
   CalculatedStation,
@@ -135,6 +135,7 @@ export default function App() {
   const [tgtHoleId, setTgtHoleId] = useState("");
   const [tipsOn, setTipsOn] = useState(loadTipsOn);
   const [startHere, setStartHere] = useState(false);
+  const [rowUndo, setRowUndo] = useState<{ rows: MeasuredStation[]; selected: number } | null>(null);
   const saveTimer = useRef<number | null>(null);
   const dirty = useRef(false);
   const demoOnce = useRef(false);
@@ -457,6 +458,7 @@ export default function App() {
         source: "manual",
       });
     }
+    setRowUndo({ rows, selected });
     setRows((prev) => [...prev, ...add]);
     setSelected(rows.length);
     scheduleSave();
@@ -467,8 +469,71 @@ export default function App() {
     );
   }
 
+  function undoRowAdd() {
+    if (!rowUndo) return;
+    setRows(rowUndo.rows);
+    setSelected(rowUndo.selected);
+    setRowUndo(null);
+    scheduleSave();
+    setStatus("Undid last row add.");
+  }
+
+  async function copyStationRow(r: MeasuredStation, pos?: { north: number; east: number; tvd: number } | null) {
+    const text = formatStationTsv(r, pos);
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      const where = pos
+        ? `N ${pos.north} E ${pos.east} TVD ${pos.tvd}. Paste into the grid or the Target N/E/TVD fields.`
+        : `INC ${r.inc_deg} AZI ${r.azi_deg}. Paste into the grid.`;
+      setStatus(`Copied MD ${Number.isFinite(r.md) ? r.md : "—"} · ${where}`);
+    } catch (e) {
+      setStatus(`Could not copy: ${e}`);
+    }
+  }
+
+  function deleteRow(i: number) {
+    if (rows.length <= 1) return;
+    setRows(rows.filter((_, j) => j !== i));
+    setSelected((s) => {
+      if (s === i) return Math.max(0, i - 1);
+      if (s > i) return s - 1;
+      return s;
+    });
+    scheduleSave();
+  }
+
   function onPasteGrid(e: ClipboardEvent) {
     const text = e.clipboardData.getData("text");
+    const el = e.target;
+    const inTarget =
+      tab === "target" ||
+      (el instanceof HTMLElement && !!el.closest(".target-delta, .tgt-coords, .tgt-spin"));
+    if (inTarget) {
+      const coords = parseTargetPaste(text);
+      if (coords) {
+        e.preventDefault();
+        setTgtN(String(coords.north));
+        setTgtE(String(coords.east));
+        setTgtTvd(String(coords.tvd));
+        setStatus(
+          `Target fields from paste: N ${coords.north} · E ${coords.east} · TVD ${coords.tvd}. Nudge, then Set / Add.`
+        );
+        return;
+      }
+      if (text.includes("\t") || text.includes("\n")) {
+        e.preventDefault();
+        setStatus("Paste a copied survey row (includes N/E/TVD) or three numbers: N, E, TVD.");
+      }
+      return;
+    }
     if (text.includes("\t") || text.includes("\n")) {
       e.preventDefault();
       applyPaste(text, "paste");
@@ -1307,9 +1372,12 @@ export default function App() {
             <button type="button" onClick={() => addSurveyRows(5)}>
               Add 5
             </button>
+            <button type="button" disabled={!rowUndo} onClick={undoRowAdd}>
+              Undo add
+            </button>
             <span className="muted">
               Holds last INC/AZI · steps MD {unit === "imperial" ? 100 : 30} {lengthLabel(unit)} ·
-              paste a table to append if MD continues
+              ⎘ copies a row (Ctrl+C) · paste appends if MD continues
             </span>
           </div>
           <SurveyGrid
@@ -1326,10 +1394,8 @@ export default function App() {
             onEnterLast={(i) => {
               if (i === rows.length - 1) addSurveyRows(1);
             }}
-            onDelete={(i) => {
-              setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, j) => j !== i)));
-              scheduleSave();
-            }}
+            onDelete={deleteRow}
+            onCopy={(row, pos) => void copyStationRow(row, pos)}
           />
         </div>
 
@@ -1423,6 +1489,9 @@ export default function App() {
                     <option value={100}>100</option>
                   </select>
                 </label>
+              </p>
+              <p className="muted">
+                Paste a copied survey row (or N, E, TVD) into these fields, then nudge with ±.
               </p>
               <div className="tgt-coords">
                 <Tip id="north" on={tipsOn}>

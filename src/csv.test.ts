@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exportCalculatedCsv, looksLikeMiningHeaders, parseSurveyTable } from "./csv";
+import { exportCalculatedCsv, formatStationTsv, looksLikeMiningHeaders, parseSurveyTable, parseTargetPaste } from "./csv";
 
 describe("parseSurveyTable", () => {
   it("parses Oregon-style headers", () => {
@@ -25,6 +25,33 @@ describe("parseSurveyTable", () => {
     const { stations, warnings } = parseSurveyTable(text, "csv");
     expect(stations).toHaveLength(0);
     expect(warnings[0]).toMatch(/Mining/);
+  });
+});
+
+describe("formatStationTsv", () => {
+  it("round-trips through paste", () => {
+    const tsv = formatStationTsv(
+      {
+        md: 8000,
+        inc_deg: 90,
+        azi_deg: 270,
+        comment: "west hold",
+        class: "measured",
+        source: "manual",
+      },
+      { north: 0, east: -3954.93, tvd: 7454.93 }
+    );
+    expect(tsv).toBe("8000\t90\t270\twest hold\t0\t-3954.93\t7454.93");
+    const { stations } = parseSurveyTable(tsv, "paste");
+    expect(stations).toHaveLength(1);
+    expect(stations[0].md).toBe(8000);
+    expect(stations[0].azi_deg).toBe(270);
+    expect(stations[0].comment).toBe("west hold");
+    expect(parseTargetPaste(tsv)).toEqual({ north: 0, east: -3954.93, tvd: 7454.93 });
+  });
+
+  it("parses three numbers as N E TVD", () => {
+    expect(parseTargetPaste("10\t-20\t6500")).toEqual({ north: 10, east: -20, tvd: 6500 });
   });
 });
 

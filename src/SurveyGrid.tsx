@@ -21,10 +21,11 @@ interface Props {
   onChange: (i: number, patch: Partial<MeasuredStation>) => void;
   onEnterLast: (i: number) => void;
   onDelete: (i: number) => void;
+  onCopy: (row: MeasuredStation, pos?: { north: number; east: number; tvd: number } | null) => void;
 }
 
 const EDIT = ["md", "inc_deg", "azi_deg", "comment"] as const;
-const COLS = 13;
+const COLS = 14;
 
 export function SurveyGrid({
   groups,
@@ -36,6 +37,7 @@ export function SurveyGrid({
   onChange,
   onEnterLast,
   onDelete,
+  onCopy,
 }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const len = lengthLabel(unit);
@@ -71,6 +73,13 @@ export function SurveyGrid({
     if (e.key === "Delete" && e.ctrlKey) {
       e.preventDefault();
       onDelete(i);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "c" && !hasTextSelection()) {
+      e.preventDefault();
+      const g = groups.find((x) => x.id === activeHoleId);
+      const row = g?.rows[i];
+      const pos = g?.calc[i];
+      if (row) onCopy(row, pos);
     }
   }
 
@@ -136,6 +145,7 @@ export function SurveyGrid({
                 Comment
               </Tip>
             </th>
+            <th className="row-ops" />
           </tr>
         </thead>
         <tbody>
@@ -252,6 +262,33 @@ export function SurveyGrid({
                         <input className="calc c" readOnly tabIndex={-1} value={r.comment} />
                       )}
                     </td>
+                    <td className="row-ops">
+                      <button
+                        type="button"
+                        className="row-copy"
+                        aria-label={`Copy row ${i + 1}`}
+                        title="Copy MD / INC / AZI"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCopy(r, c);
+                        }}
+                      >
+                        ⎘
+                      </button>
+                      {active && g.rows.length > 1 ? (
+                        <button
+                          type="button"
+                          className="row-x"
+                          aria-label={`Delete row ${i + 1}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(i);
+                          }}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </td>
                   </tr>
                 );
               })}
@@ -262,6 +299,14 @@ export function SurveyGrid({
       </table>
     </div>
   );
+}
+
+function hasTextSelection(): boolean {
+  const el = document.activeElement;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return el.selectionStart !== el.selectionEnd;
+  }
+  return (window.getSelection()?.toString().length ?? 0) > 0;
 }
 
 function parseNum(s: string): number {

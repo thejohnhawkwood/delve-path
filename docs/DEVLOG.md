@@ -204,3 +204,13 @@ Glossary tips used `::after` above the label, so toolbar / header / edge hovers 
 ## First commit of the working tree
 
 Repo had only the GitHub `Initial commit`. This land adds the Tauri/React/Rust prototype, `delve-core` / `delve-storage`, research goldens and source PDFs, and planning docs. Build artifacts (`target/`, `node_modules/`, installers) stay gitignored.
+
+---
+
+# DEVLOG — row copy / undo / target paste + 0.1.1
+
+**2026-08-14**
+
+- **Undo add** plus **×** on active-hole rows (last row kept).
+- Copy row (⎘ or Ctrl+C unless a cell has a text selection): MD/INC/AZI/comment plus calculated N/E/TVD. Grid paste still treats the first three columns as a station. Target tab paste fills N/E/TVD (or three numbers). Does not replace the survey.
+- README and `EVALUATION.txt` updated for evaluation **0.1.1**. Status: **WORKING**. Desktop copy/paste in the Tauri shell **NOT YET VALIDATED** as a formal test.

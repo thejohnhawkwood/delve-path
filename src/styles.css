@@ -120,6 +120,16 @@ table.survey input {
 table.survey input.edit { color: var(--edit); }
 table.survey input.calc { color: var(--calc); }
 table.survey input.c { text-align: left; }
+table.survey th.row-ops, table.survey td.row-ops {
+  width: 40px; min-width: 40px; max-width: 44px; padding: 0; text-align: center;
+  white-space: nowrap;
+}
+table.survey button.row-copy, table.survey button.row-x {
+  border: none; background: transparent;
+  color: var(--muted); padding: 2px 3px; line-height: 1; font-size: 13px;
+}
+table.survey button.row-copy:hover { color: var(--edit); }
+table.survey button.row-x:hover { color: var(--red); }
 
 .viz {
   grid-column: 2; min-height: 0; height: 100%;

@@ -5,19 +5,37 @@ Not regulator-approved. Not for collision avoidance, well control, or steering d
 
 Offline Windows field app for directional borehole survey calculation and visualization (Mithril Consulting). Survey reconstruction uses **Minimum Curvature** as documented by ISCWSA. Results are **not** claimed bit-identical to WinSERVE.
 
+Current evaluation build: **0.1.1**.
+
 ## What this build does
 
-- Local project / hole files (`*.delvepath` SQLite)
-- Keyboard-first MD → INC → AZI entry, paste, and CSV import
+- Local project / hole files (`*.delvepath` SQLite, schema through v4)
+- Keyboard-first MD → INC → AZI entry; **Add row** / **Add 5** (hold last INC/AZI, step MD); **Undo add**; **×** to delete a row
+- Copy a row (**⎘** or Ctrl+C): MD / INC / AZI / comment plus calculated N / E / TVD. Paste into the grid (appends if MD is deeper) or into the **Target** N/E/TVD fields
+- Excel/tab paste and CSV import (one hole per file)
 - Oilfield inclination-from-vertical only (0° = vertical down)
-- Current position, plan / profile / 3-D (Plotly, bundled locally)
-- Point targets and numeric N/E/TVD deltas
-- Straight Line continuation / bit projection (hold last I/A; WSdoc name), labelled **PROJECTED** (not WinSERVE BHL “trend of last two surveys”)
+- Current position; Plan / Profile / 3-D (Plotly, bundled locally); wrapping HTML legend
+- **Parent wellbore + sidetracks:** branch from a selected measured station; laterals are separate holes tied on at the parent’s calculated N/E/TVD; plots overlay all holes
+- **Targets:** junction (parent) and child lateral targets; numeric N/E/TVD deltas
+- Path colors (swatch next to Hole); combined color-coded survey table; click a plot point to select that row
+- Straight Line continuation / bit projection (hold last I/A), labelled **PROJECTED** (not WinSERVE BHL “trend of last two surveys”)
+- Glossary tips that stay on screen; Start Here walkthrough
+- Demos: Oregon 24c-23-65 (public WinSERVE); **Load dual-lateral example** (synthetic / constructed)
 - CSV export and a printable report
 
 ## What it does not do
 
-Mining-convention conversion, ISCWSA positional uncertainty, anti-collision, well-plan solvers, cloud sync, or any LLM in the calculation path. Declination / grid convergence are notes only — they are not auto-applied.
+Mining-convention conversion, ISCWSA positional uncertainty, anti-collision, well-plan solvers, TAML junction hardware, interpolated kick-off at an arbitrary MD (selected measured row only), cloud sync, or any LLM in the calculation path. Declination / grid convergence are notes only — they are not auto-applied.
+
+## Frozen Windows installer
+
+After `npm run tauri -- build`, the NSIS installer is:
+
+`src-tauri/target/release/bundle/nsis/DelvePath_0.1.1_x64-setup.exe`
+
+A copy for handoff may also be on the Desktop as `DelvePath-evaluation-0.1.1`. See `EVALUATION.txt` in that folder.
+
+The evaluation window still opens with the Oregon example. Use **Load dual-lateral example** for the constructed east/west laterals.
 
 ## Run (development)
 
@@ -25,6 +43,13 @@ Requires Rust, MSVC C++ build tools (`link.exe`), Node 20+, and WebView2.
 
 ```text
 npm install
+npm run tauri dev
+```
+
+If `cargo` is not on PATH in that shell:
+
+```text
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm run tauri dev
 ```
 
@@ -40,8 +65,6 @@ npm run test-ui
 
 Production config uses a local `frontendDist`, CSP without CDNs, and `webviewInstallMode.offlineInstaller`. Plotly needs `'unsafe-eval'` in CSP; that is a local-script allowance, not network access. See `docs/OFFLINE_REQUIREMENTS.md`.
 
-Air-gap installer validation may still be **NOT YET VALIDATED** until a production bundle is built and tested with networking disabled.
-
 ## Docs
 
-Start at `docs/PRD.md`, `docs/CALCULATION_SPEC.md`, `docs/MVP_ACCEPTANCE.md`.
+Start at `docs/PRD.md`, `docs/CALCULATION_SPEC.md`, `docs/MVP_ACCEPTANCE.md`, `docs/DEVLOG.md`.

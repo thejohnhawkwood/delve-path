@@ -1,4 +1,4 @@
-DelvePath — evaluation prototype
+DelvePath — evaluation prototype 0.1.1
 Mithril Consulting
 
 NOT CERTIFIED. Not regulator-approved. Not for collision avoidance, well control,
@@ -8,10 +8,17 @@ This build opens with a public Oregon WinSERVE survey (24c-23-65, feet,
 VSP 165.30°, tie-in MD = TVD = 445 ft). Click Start here for a short tour.
 Uncheck Tips to turn off term mouseovers.
 
+Load dual-lateral example is SYNTHETIC / constructed — not a filed as-drilled
+match. One vertical parent lands east; Lateral B branches at MD 6500 ft and
+lands west. Branch from selected station does the same from any measured row.
+
+Copy a survey row (icon or Ctrl+C), then paste into the grid or the Target
+N/E/TVD fields and nudge. Add row / Undo add / × delete a station.
+
 New / Open uses a local *.delvepath file on this machine. No cloud, no login.
 
 Install: run the NSIS installer. WebView2 may be installed locally by the
 offline installer if Windows does not already have it.
 
-Do not treat plotted targets (e.g. “Big Sand”) as part of the Oregon filing.
-That target is a demo point only.
+Do not treat plotted demo targets (e.g. “Big Sand”, East/West BHL) as part of
+the Oregon filing.
