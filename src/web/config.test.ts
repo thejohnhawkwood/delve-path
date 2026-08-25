@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT, desktopDownloadUrl, mithrilContactUrl, mithrilUrl, SAFETY, sourceUrl } from "./config";
+import { CREDIT, desktopDownloadUrl, mithrilContactUrl, mithrilUrl, publicUrl, SAFETY, sourceUrl } from "./config";
 
 describe("public links", () => {
   it("uses safe Mithril and source URLs", () => {
@@ -10,6 +10,11 @@ describe("public links", () => {
     expect(SAFETY).toMatch(/not certified/i);
     expect(SAFETY).toMatch(/collision avoidance/);
     expect(SAFETY).toMatch(/well control/);
+  });
+
+  it("prefixes public assets with Vite base", () => {
+    expect(publicUrl("brand/x.png")).toBe("/brand/x.png");
+    expect(publicUrl("/legal/LICENSE.txt")).toBe("/legal/LICENSE.txt");
   });
 
   it("uses the approved Drive folder URL without rewriting it", () => {

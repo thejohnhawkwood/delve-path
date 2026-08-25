@@ -8,6 +8,7 @@ import {
   externalRel,
   mithrilContactUrl,
   mithrilUrl,
+  publicUrl,
   SAFETY,
   sourceUrl,
 } from "./config";
@@ -40,7 +41,7 @@ export function SiteApp() {
       </a>
       <header className="site-header">
         <a className="site-lockup" href="#top">
-          <img src="/brand/delvepath-lockup-transparent.png" alt="DelvePath" height={40} />
+          <img src={publicUrl("brand/delvepath-lockup-transparent.png")} alt="DelvePath" height={40} />
         </a>
         <nav className="site-nav" aria-label="DelvePath">
           <a href="#workspace">Live Demo</a>
@@ -167,13 +168,13 @@ export function SiteApp() {
       </main>
 
       <footer className="site-footer">
-        <img src="/brand/delvepath-icon-transparent.png" alt="" width={36} height={36} />
+        <img src={publicUrl("brand/delvepath-icon-transparent.png")} alt="" width={36} height={36} />
         <div>
           <p className="credit">{CREDIT}</p>
           <p>
-            <a href="/legal/LICENSE.txt">Apache-2.0</a>
+            <a href={publicUrl("legal/LICENSE.txt")}>Apache-2.0</a>
             {" · "}
-            <a href="/legal/NOTICE.txt">NOTICE</a>
+            <a href={publicUrl("legal/NOTICE.txt")}>NOTICE</a>
             {" · "}
             <button type="button" className="linkish" onClick={() => setAbout(true)}>
               Licenses

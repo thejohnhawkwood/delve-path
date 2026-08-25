@@ -32,3 +32,10 @@ export const desktopMeta = {
 export function externalRel(): { target: "_blank"; rel: "noopener noreferrer" } {
   return { target: "_blank", rel: "noopener noreferrer" };
 }
+
+/** Public-folder URL that respects Vite `base` (standalone `/` or `/delvepath/`). */
+export function publicUrl(path: string): string {
+  const base = import.meta.env.BASE_URL || "/";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  return `${prefix}${path.replace(/^\/+/, "")}`;
+}
