@@ -1,0 +1,14 @@
+DelvePath
+Copyright © 2026 Philip Bird, Mithril Consulting.
+
+Created by Philip Bird — Mithril Consulting
+
+This product includes software developed by Philip Bird for Mithril Consulting
+and third-party components listed in THIRD_PARTY_NOTICES.md.
+
+Legal owner
+Philip Bird is the copyright owner. Mithril Consulting is his public business
+name (a trade name), not an incorporated company. This NOTICE does not claim
+corporate personhood or a registered ® mark.
+
+This NOTICE file is for attribution. It does not modify the Apache License 2.0.

@@ -16,7 +16,7 @@ export const GLOSSARY = {
   convention: "How inclination is defined. This build is oilfield from vertical only. Mining dip import is refused.",
   units: "Display units. Internally the engine uses metres and radians. Feet and °/100 ft are converted, not relabelled.",
   aziRef: "Which north the azimuths are already in. Declination and grid are notes only — they are not applied.",
-  project: "A local DelvePath job file (*.delvepath, SQLite). Holds holes, surveys, and targets. Not a WinSERVE .SVY.",
+  project: "Desktop: a local *.delvepath SQLite file. Browser: an IndexedDB project on this device, optionally exported as .delvepath.json. Not a WinSERVE .SVY. The two file types are not interchangeable.",
   hole: "One borehole inside the project. A parent wellbore or a sidetrack/lateral. Surveys and targets belong to the hole.",
   parentWellbore: "API RP 78 DSR: the original wellbore that a sidetrack originates from. Laterals do not re-enter the parent’s stations — overlay both holes on the plots.",
   kickOff: "Kick-off / branch point. This build uses the selected measured station as KOP (no interpolated station at an arbitrary MD). DSR would interpolate min-curvature at kick-off; that solver is not added.",

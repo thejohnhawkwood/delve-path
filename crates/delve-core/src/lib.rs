@@ -5,9 +5,7 @@ pub mod types;
 pub mod units;
 pub mod validate;
 
-pub use min_curvature::{
-    calculate_trajectory, tangent_continue, tangent_to_tvd, SMALL_BETA_RAD,
-};
+pub use min_curvature::{calculate_trajectory, tangent_continue, tangent_to_tvd, SMALL_BETA_RAD};
 pub use types::*;
 pub use units::*;
 pub use validate::{has_blocking_error, validate_stations};

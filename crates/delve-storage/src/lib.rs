@@ -178,12 +178,16 @@ impl Store {
             self.conn
                 .execute("ALTER TABLE holes ADD COLUMN branch_md REAL", [])?;
         }
-        let version: i64 = self
-            .conn
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
+        let version: i64 = self.conn.query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+            [],
+            |r| r.get(0),
+        )?;
         if version < 2 {
-            self.conn
-                .execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)", [])?;
+            self.conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (2)",
+                [],
+            )?;
         }
         Ok(())
     }
@@ -194,12 +198,16 @@ impl Store {
             self.conn
                 .execute("ALTER TABLE targets ADD COLUMN parent_target_id TEXT", [])?;
         }
-        let version: i64 = self
-            .conn
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
+        let version: i64 = self.conn.query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+            [],
+            |r| r.get(0),
+        )?;
         if version < 3 {
-            self.conn
-                .execute("INSERT OR IGNORE INTO schema_version (version) VALUES (3)", [])?;
+            self.conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (3)",
+                [],
+            )?;
         }
         Ok(())
     }
@@ -210,12 +218,16 @@ impl Store {
             self.conn
                 .execute("ALTER TABLE holes ADD COLUMN color TEXT", [])?;
         }
-        let version: i64 = self
-            .conn
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
+        let version: i64 = self.conn.query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+            [],
+            |r| r.get(0),
+        )?;
         if version < 4 {
-            self.conn
-                .execute("INSERT OR IGNORE INTO schema_version (version) VALUES (4)", [])?;
+            self.conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (4)",
+                [],
+            )?;
         }
         Ok(())
     }
@@ -327,7 +339,11 @@ impl Store {
         Ok(())
     }
 
-    pub fn replace_stations(&self, hole_id: &str, stations: &[StationRecord]) -> Result<(), StorageError> {
+    pub fn replace_stations(
+        &self,
+        hole_id: &str,
+        stations: &[StationRecord],
+    ) -> Result<(), StorageError> {
         let tx = self.conn.unchecked_transaction()?;
         tx.execute("DELETE FROM stations WHERE hole_id=?1", [hole_id])?;
         for s in stations {
@@ -453,7 +469,8 @@ mod tests {
             north_tie: Some(0.0),
             east_tie: Some(0.0),
         };
-        db.replace_stations(&h.id, &[s.clone()]).unwrap();
+        db.replace_stations(&h.id, std::slice::from_ref(&s))
+            .unwrap();
         let back = db.list_stations(&h.id).unwrap();
         assert_eq!(back.len(), 1);
         assert_eq!(back[0].md, 445.0);
@@ -610,7 +627,10 @@ mod tests {
         let listed = db.list_targets(&h.id).unwrap();
         assert_eq!(listed.len(), 2);
         let child = listed.iter().find(|t| t.id == east.id).unwrap();
-        assert_eq!(child.parent_target_id.as_deref(), Some(junction.id.as_str()));
+        assert_eq!(
+            child.parent_target_id.as_deref(),
+            Some(junction.id.as_str())
+        );
         db.delete_target(&junction.id).unwrap();
         let after = db.list_targets(&h.id).unwrap();
         assert_eq!(after.len(), 1);

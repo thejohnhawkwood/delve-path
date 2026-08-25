@@ -1,6 +1,4 @@
-use crate::types::{
-    MeasuredStation, Severity, StationClass, SurveyConvention, ValidationIssue,
-};
+use crate::types::{MeasuredStation, Severity, StationClass, SurveyConvention, ValidationIssue};
 
 pub fn validate_stations(
     convention: SurveyConvention,
@@ -29,9 +27,17 @@ pub fn validate_stations(
             out.push(err(i, "md_invalid", "MD is missing or not finite."));
         }
         if !s.inc_deg.is_finite() {
-            out.push(err(i, "inc_invalid", "Inclination is missing or not finite."));
+            out.push(err(
+                i,
+                "inc_invalid",
+                "Inclination is missing or not finite.",
+            ));
         } else if !(0.0..=180.0).contains(&s.inc_deg) {
-            out.push(err(i, "inc_range", "Inclination must be 0–180° (oilfield, from vertical)."));
+            out.push(err(
+                i,
+                "inc_range",
+                "Inclination must be 0–180° (oilfield, from vertical).",
+            ));
         }
         if !s.azi_deg.is_finite() {
             out.push(err(i, "azi_invalid", "Azimuth is missing or not finite."));
@@ -54,7 +60,11 @@ pub fn validate_stations(
             if (b.md - a.md).abs() < 1e-12 {
                 out.push(err(i, "md_duplicate", "Duplicate MD."));
             } else if b.md < a.md {
-                out.push(err(i, "md_decreasing", "MD decreases. List was not silently sorted."));
+                out.push(err(
+                    i,
+                    "md_decreasing",
+                    "MD decreases. List was not silently sorted.",
+                ));
             }
         }
     }

@@ -1,10 +1,28 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
+import { initPlatform, isTauri } from "./platform";
+import { appVersion } from "./web/config";
 import "./styles.css";
+import "./web/site.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+async function boot() {
+  await initPlatform(appVersion);
+  const root = ReactDOM.createRoot(document.getElementById("root")!);
+  if (isTauri()) {
+    const { default: App } = await import("./App");
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+    return;
+  }
+  const { SiteApp } = await import("./web/SiteApp");
+  root.render(
+    <React.StrictMode>
+      <SiteApp />
+    </React.StrictMode>
+  );
+}
+
+void boot();

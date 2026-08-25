@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import {
   calculate,
   createProject,
   deleteTarget,
-  isTauri,
   lastMeasured,
   listHoles,
   loadStations,
@@ -23,7 +22,12 @@ import {
   type ProjectRecord,
   type StationRecord,
 } from "./api";
-import { Charts, type HoleOverlay } from "./Charts";
+import { type HoleOverlay } from "./Charts";
+import { getPlatform } from "./platform";
+import { AboutDialog } from "./web/AboutDialog";
+import { ProjectChooser } from "./web/ProjectChooser";
+
+const Charts = lazy(() => import("./Charts").then((m) => ({ default: m.Charts })));
 import { asColorInput, COLOR_PRESETS, defaultHoleColor, PARENT_HOLE_COLOR } from "./colors";
 import { asClass, exportCalculatedCsv, formatStationTsv, measuredOnly, parseSurveyTable, parseTargetPaste } from "./csv";
 import type {
@@ -135,7 +139,10 @@ export default function App() {
   const [tgtHoleId, setTgtHoleId] = useState("");
   const [tipsOn, setTipsOn] = useState(loadTipsOn);
   const [startHere, setStartHere] = useState(false);
+  const [about, setAbout] = useState(false);
+  const [chooser, setChooser] = useState(false);
   const [rowUndo, setRowUndo] = useState<{ rows: MeasuredStation[]; selected: number } | null>(null);
+  const runtime = getPlatform().kind;
   const saveTimer = useRef<number | null>(null);
   const dirty = useRef(false);
   const demoOnce = useRef(false);
@@ -157,10 +164,6 @@ export default function App() {
   }, [unit, aziRef, vsp, tie, rows]);
 
   const recalc = useCallback(async () => {
-    if (!isTauri()) {
-      setStatus("UI only — launch with npm run tauri dev so delve-core can calculate.");
-      return;
-    }
     const r = req();
     if (r.stations.length === 0) {
       setTraj(null);
@@ -205,10 +208,7 @@ export default function App() {
   useEffect(() => {
     if (demoOnce.current) return;
     demoOnce.current = true;
-    loadOregon();
-    setStatus(
-      "Evaluation build — Oregon 24c-23-65 loaded. Start here walks the rest. Not certified."
-    );
+    void bootDemo();
   }, []);
 
   function snapshotDraft(id?: string) {
@@ -242,7 +242,7 @@ export default function App() {
   }
 
   const persist = useCallback(async () => {
-    if (!isTauri() || !project || !hole) return;
+    if (!project || !hole) return;
     const measured = measuredOnly(rows);
     const recs: StationRecord[] = measured.map((s, i) => ({
       id: crypto.randomUUID(),
@@ -293,15 +293,16 @@ export default function App() {
   }, [persist]);
 
   async function onNew() {
-    if (!isTauri()) {
-      setStatus("New project requires the Tauri shell.");
-      return;
-    }
-    const path = await pickSavePath();
-    if (!path) return;
     const name = window.prompt("Project name", "Field project") ?? "Field project";
     const client = window.prompt("Client", "") ?? "";
-    const p = await createProject(path, name, client);
+    let p: ProjectRecord;
+    if (runtime === "tauri") {
+      const path = await pickSavePath();
+      if (!path) return;
+      p = await createProject(path, name, client);
+    } else {
+      p = await getPlatform().repo.create({ name, client });
+    }
     const hid = await newUuid();
     const h: HoleRecord = {
       id: hid,
@@ -328,12 +329,12 @@ export default function App() {
     setAllTargets([]);
     setTgtHoleId(hid);
     drafts.current = {};
-    setStatus(`Created ${path}`);
+    setStatus(runtime === "tauri" ? "Created desktop project." : "Created local browser project. Data stays on this device.");
   }
 
   async function onOpen() {
-    if (!isTauri()) {
-      setStatus("Open project requires the Tauri shell.");
+    if (runtime === "browser") {
+      setChooser(true);
       return;
     }
     const path = await pickOpenPath();
@@ -399,7 +400,7 @@ export default function App() {
     if (draft) {
       setHole(next);
       applyDraft(draft);
-    } else if (isTauri() && project) {
+    } else if (project) {
       await applyStoredHole(next);
     } else {
       setHole(next);
@@ -562,13 +563,110 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   }
 
-  function loadOregon() {
+  async function bootDemo() {
+    const platform = getPlatform();
+    if (platform.kind === "browser") {
+      const last = await platform.repo.getLastOpenedId();
+      const list = await platform.repo.list();
+      if (last && list.some((p) => p.id === last)) {
+        try {
+          const p = await platform.repo.open(last);
+          const listed = await platform.repo.listHoles(p.id);
+          setProject(p);
+          setHoles(listed);
+          if (listed[0]) await applyStoredHole(listed[0]);
+          setStatus("Reopened local browser project. Data stays on this device. Not certified.");
+          return;
+        } catch {
+          /* load Oregon */
+        }
+      }
+      const p = await platform.repo.create({ name: "Oregon 24c-23-65", client: "" });
+      const hid = await newUuid();
+      const h = makeHoleRec(hid, p.id, "Hole 1");
+      await saveHole(h);
+      setProject(p);
+      loadOregon(h);
+      setStatus("Evaluation build — Oregon 24c-23-65 loaded. Start here walks the rest. Not certified.");
+      return;
+    }
+    loadOregon();
+    setStatus("Evaluation build — Oregon 24c-23-65 loaded. Start here walks the rest. Not certified.");
+  }
+
+  async function openBrowserProject(id: string) {
+    const p = await openProject(id);
+    const listed = await listHoles(p.id);
+    setProject(p);
+    setHoles(listed);
+    drafts.current = {};
+    if (listed[0]) await applyStoredHole(listed[0]);
+    else {
+      setHole(null);
+      setRows([emptyRow(0)]);
+    }
+    setChooser(false);
+    setStatus(`Opened local project ${p.name}. Data stays on this device.`);
+  }
+
+  async function exportBrowserSnapshot() {
+    if (!project) {
+      setStatus("Create or open a browser project first.");
+      return;
+    }
+    try {
+      if (dirty.current) await persist();
+      const snap = await getPlatform().repo.exportSnapshot(project.id);
+      const safe = project.name.replace(/[^\w.-]+/g, "-") || "project";
+      await getPlatform().files.saveTextFile(
+        `${safe}.delvepath.json`,
+        JSON.stringify(snap, null, 2),
+        "application/json"
+      );
+      setStatus("Exported browser snapshot (.delvepath.json). Not a desktop SQLite file.");
+    } catch (e) {
+      setStatus(String(e));
+    }
+  }
+
+  async function importBrowserSnapshot() {
+    const file = await getPlatform().files.pickTextFile(".json,.delvepath.json,application/json");
+    if (!file) return;
+    try {
+      const parsed: unknown = JSON.parse(file.text);
+      const p = await getPlatform().repo.importSnapshot(parsed);
+      await openBrowserProject(p.id);
+      setStatus(`Imported ${p.name} as a new local project. Existing projects were not replaced.`);
+    } catch (e) {
+      setStatus(`Import rejected — local data unchanged. ${e}`);
+    }
+  }
+
+  async function resetBrowserDemo() {
+    if (
+      !window.confirm(
+        "Reset all local browser projects on this device? Built-in Oregon and dual-lateral examples will still be available."
+      )
+    ) {
+      return;
+    }
+    await getPlatform().repo.resetAll();
+    drafts.current = {};
+    setProject(null);
+    setHole(null);
+    setHoles([]);
+    demoOnce.current = false;
+    await bootDemo();
+  }
+
+  function loadOregon(existing?: HoleRecord | null) {
     setUnit("imperial");
     setVsp(165.3);
     setTie({ tvd: 445, north: 0, east: 0 });
     setAziRef("unknown");
-    if (hole) {
-      const h = { ...hole, parent_hole_id: null, branch_md: null };
+    const current = existing ?? hole;
+    if (current) {
+      const h = { ...current, parent_hole_id: null, branch_md: null };
       setHole(h);
       setHoles([h]);
     } else {
@@ -645,7 +743,7 @@ export default function App() {
   }
 
   async function persistHoleDraft(h: HoleRecord, d: HoleDraft) {
-    if (!isTauri() || !h.project_id) return;
+    if (!h.project_id) return;
     await saveHole(h);
     const measured = measuredOnly(d.rows);
     await saveStations(
@@ -723,7 +821,7 @@ export default function App() {
     setHoles([parentHole, latHole]);
     setHole(parentHole);
     applyDraft(parentDraft);
-    if (isTauri() && project) {
+    if (project) {
       await persistHoleDraft(parentHole, parentDraft);
       await persistHoleDraft(latHole, latDraft);
     }
@@ -741,7 +839,7 @@ export default function App() {
     let parent = hole;
     let p = project;
     if (!parent) {
-      if (isTauri()) {
+      if (runtime === "tauri") {
         const path = await pickSavePath();
         if (!path) {
           setStatus("Save a project first, then branch from the selected station.");
@@ -750,32 +848,24 @@ export default function App() {
         const name = window.prompt("Project name", "Field project") ?? "Field project";
         const client = window.prompt("Client", "") ?? "";
         p = await createProject(path, name, client);
-        setProject(p);
-        const hid = await newUuid();
-        parent = makeHoleRec(hid, p.id, "Hole 1", {
-          unit_system: unit,
-          azimuth_reference: aziRef,
-          vsp_deg: vsp,
-        });
-        await saveHole(parent);
-        setHole(parent);
-        setHoles([parent]);
       } else {
-        parent = makeHoleRec(crypto.randomUUID(), "", "Hole 1", {
-          unit_system: unit,
-          azimuth_reference: aziRef,
-          vsp_deg: vsp,
-        });
-        setHole(parent);
-        setHoles([parent]);
+        p = await getPlatform().repo.create({ name: "Field project", client: "" });
       }
+      setProject(p);
+      const hid = await newUuid();
+      parent = makeHoleRec(hid, p.id, "Hole 1", {
+        unit_system: unit,
+        azimuth_reference: aziRef,
+        vsp_deg: vsp,
+      });
+      await saveHole(parent);
+      setHole(parent);
+      setHoles([parent]);
     }
     snapshotDraft(parent.id);
     const calcAt =
       traj?.stations.find((s) => Math.abs(s.md - row.md) < 1e-6) ??
-      (isTauri()
-        ? (await calculate(req()).catch(() => null))?.stations.find((s) => Math.abs(s.md - row.md) < 1e-6)
-        : undefined);
+      (await calculate(req()).catch(() => null))?.stations.find((s) => Math.abs(s.md - row.md) < 1e-6);
     let warn = "";
     const branchTie: TieIn = calcAt
       ? { tvd: calcAt.tvd, north: calcAt.north, east: calcAt.east }
@@ -784,7 +874,7 @@ export default function App() {
     const kids = holes.filter((h) => h.parent_hole_id === parent.id);
     const letter = String.fromCharCode(66 + kids.length);
     const latName = `Lateral ${letter}`;
-    const latId = isTauri() ? await newUuid() : crypto.randomUUID();
+    const latId = await newUuid();
     const lat: HoleRecord = makeHoleRec(latId, p?.id ?? parent.project_id, latName, {
       unit_system: unit,
       azimuth_reference: aziRef,
@@ -813,7 +903,7 @@ export default function App() {
       const hasParent = prev.some((h) => h.id === parent.id);
       return hasParent ? [...prev, lat] : [parent, lat];
     });
-    if (isTauri() && (p || project) && parent.project_id) {
+    if ((p || project) && parent.project_id) {
       const parentDraft = drafts.current[parent.id] ?? { rows, tie, unit, aziRef, vsp, targets };
       await persistHoleDraft({ ...parent, project_id: (p ?? project)!.id }, parentDraft);
       await persistHoleDraft({ ...lat, project_id: (p ?? project)!.id }, latDraft);
@@ -871,7 +961,7 @@ export default function App() {
         let stations: CalculatedStation[] = [];
         if (h.id === hole?.id && traj) {
           stations = traj.stations;
-        } else if (d && measuredOnly(d.rows).length > 0 && isTauri()) {
+        } else if (d && measuredOnly(d.rows).length > 0) {
           try {
             const t = await calculate({
               unit_system: d.unit,
@@ -885,7 +975,7 @@ export default function App() {
           } catch {
             stations = [];
           }
-        } else if (!d && isTauri() && project) {
+        } else if (!d && project) {
           try {
             const st = await loadStations(h.id);
             const mapped: MeasuredStation[] = st.map((s) => ({
@@ -998,7 +1088,7 @@ export default function App() {
     }
     setAllTargets((prev) => upsertList(oldHole ? prev.filter((x) => x.id !== t.id) : prev, t));
     fillForm(t);
-    if (isTauri() && project) void saveTarget(t);
+    if (project) void saveTarget(t);
     if (hole) scheduleSave();
   }
 
@@ -1015,7 +1105,7 @@ export default function App() {
       prev.filter((x) => x.id !== id).map((x) => (x.parent_target_id === id ? { ...x, parent_target_id: null } : x))
     );
     setSelectedTargetId(null);
-    if (isTauri() && project) void deleteTarget(id);
+    if (project) void deleteTarget(id);
     setStatus("Target deleted. Child targets (if any) are now standalone.");
     if (hole) scheduleSave();
   }
@@ -1065,9 +1155,10 @@ export default function App() {
 
   return (
     <div className="app" onPaste={onPasteGrid}>
-      <div className="banner">
-        Engineering prototype / evaluation software — not certified. Not for collision avoidance
-        or steering. Minimum Curvature (ISCWSA). Not claimed bit-identical to WinSERVE.
+      <div className="banner" role="note">
+        Engineering prototype / evaluation software — not certified. Not regulator-approved. Not
+        for collision avoidance, well control, or steering decisions. Minimum Curvature (ISCWSA).
+        Not claimed bit-identical to WinSERVE.
       </div>
       <div className="toolbar">
         <span className="name">DELVEPATH</span>
@@ -1083,6 +1174,22 @@ export default function App() {
         </button>
         <button onClick={() => void onOpen()}>Open</button>
         <button onClick={() => void persist()}>Save</button>
+        {runtime === "browser" && (
+          <>
+            <button type="button" onClick={() => void exportBrowserSnapshot()}>
+              Export project
+            </button>
+            <button type="button" onClick={() => void importBrowserSnapshot()}>
+              Import project
+            </button>
+            <button type="button" onClick={() => void resetBrowserDemo()}>
+              Reset demo
+            </button>
+          </>
+        )}
+        <button type="button" onClick={() => setAbout(true)}>
+          About
+        </button>
         <label>
           <Tip id="project" on={tipsOn}>
             Project
@@ -1243,7 +1350,7 @@ export default function App() {
           </button>
         </Tip>
         <Tip id="oregon" on={tipsOn}>
-          <button onClick={loadOregon}>Oregon example</button>
+          <button onClick={() => loadOregon()}>Oregon example</button>
         </Tip>
         <Tip id="lateral" on={tipsOn}>
           <button onClick={() => void loadDualLateral()}>Load dual-lateral example</button>
@@ -1344,7 +1451,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <p>Enter MD / INC / AZI. Calculated fields stay empty until delve-core runs.</p>
+            <p>Enter MD / INC / AZI. Calculated fields stay empty until the engine returns a path.</p>
           )}
         </section>
 
@@ -1628,16 +1735,18 @@ export default function App() {
               )}
             </div>
           ) : (
-            <Charts
-              tab={tab}
-              stations={calcStations}
-              overlays={overlays}
-              selected={Math.min(selected, Math.max(0, calcStations.length - 1))}
-              targets={allTargets.length ? allTargets : targets}
-              vspDeg={vsp}
-              currentHoleId={hole?.id ?? null}
-              onPickStation={(holeId, index) => void pickStation(holeId, index)}
-            />
+            <Suspense fallback={<p className="workspace-loading">Loading plots…</p>}>
+              <Charts
+                tab={tab}
+                stations={calcStations}
+                overlays={overlays}
+                selected={Math.min(selected, Math.max(0, calcStations.length - 1))}
+                targets={allTargets.length ? allTargets : targets}
+                vspDeg={vsp}
+                currentHoleId={hole?.id ?? null}
+                onPickStation={(holeId, index) => void pickStation(holeId, index)}
+              />
+            </Suspense>
           )}
         </section>
       </div>
@@ -1667,13 +1776,18 @@ export default function App() {
       {startHere && (
         <StartHere
           onClose={() => setStartHere(false)}
-          onLoadOregon={loadOregon}
+          onLoadOregon={() => loadOregon()}
           onLoadDual={() => void loadDualLateral()}
           onSampleTarget={applySampleTarget}
           onGoTab={setTab}
           tipsOn={tipsOn}
           onTips={setTips}
+          runtime={runtime}
         />
+      )}
+      {about && <AboutDialog onClose={() => setAbout(false)} />}
+      {chooser && (
+        <ProjectChooser onClose={() => setChooser(false)} onOpen={(id) => void openBrowserProject(id)} />
       )}
     </div>
   );

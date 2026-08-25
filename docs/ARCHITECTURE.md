@@ -4,15 +4,22 @@
 
 ```text
 React UI  (Vite + TypeScript strict)
-    │ typed Tauri commands only — no raw SQL
+    │ typed platform services — no raw SQL, no scattered isTauri()
     ▼
-Tauri 2 app  (commands, dialogs, lifecycle, offline bundle)
-    │
-    ├── delve-storage  (SQLite + migrations + repositories)
-    └── delve-core     (pure Rust domain + min curvature)
+src/platform   (CalculationService + ProjectRepository + files)
+    ├── Tauri adapter   → IPC + SQLite (*.delvepath)
+    └── Browser adapter → WASM + IndexedDB + .delvepath.json
+         │
+         ▼
+    crates/delve-wasm   (wasm-bindgen only)
+         │
+         ▼
+    delve-core     (pure Rust domain + min curvature)
 ```
 
-**Invariant:** `delve-core` does not know Tauri, SQLite, or the UI exist.
+Desktop still hosts through Tauri 2 + `delve-storage`. The browser never opens SQLite.
+
+**Invariant:** `delve-core` does not know Tauri, SQLite, IndexedDB, React, or the UI exist.
 
 ## Workspace
 

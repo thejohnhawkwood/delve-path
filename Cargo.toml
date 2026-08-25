@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/delve-core", "crates/delve-storage", "src-tauri"]
+members = ["crates/delve-core", "crates/delve-storage", "crates/delve-wasm", "src-tauri"]
 
 [workspace.package]
 edition = "2021"
-license = "LicenseRef-Proprietary"
-authors = ["Mithril Consulting"]
+license = "Apache-2.0"
+authors = ["Philip Bird"]
 
 [workspace.dependencies]
 delve-core = { path = "crates/delve-core" }

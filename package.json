@@ -2,16 +2,24 @@
   "name": "delvepath",
   "private": true,
   "version": "0.1.1",
+  "license": "Apache-2.0",
+  "author": "Philip Bird",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/copy-legal.mjs",
+    "build:wasm": "node scripts/build-wasm.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "test-ui": "vitest run",
     "test-core": "cargo test -p delve-core",
     "test-golden": "cargo test -p delve-core --test golden",
-    "test-all": "cargo test -p delve-core -p delve-storage && vitest run && cargo tauri build --debug"
+    "test-wasm": "cargo test -p delve-wasm && vitest run src/platform src/wasm",
+    "test-e2e": "playwright test",
+    "test-license": "node scripts/check-license.mjs",
+    "test-sbom": "node scripts/generate-sbom.mjs",
+    "test-bundle": "node scripts/check-web-bundle.mjs",
+    "test-all": "cargo test -p delve-core -p delve-storage -p delve-wasm && vitest run && cargo tauri build --debug"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -21,10 +29,12 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.6"

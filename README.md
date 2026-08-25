@@ -1,11 +1,15 @@
 # DelvePath
 
+Created by Philip Bird — Mithril Consulting.
+
 **Engineering prototype / evaluation software — not certified.**  
 Not regulator-approved. Not for collision avoidance, well control, or steering decisions.
 
-Offline Windows field app for directional borehole survey calculation and visualization (Mithril Consulting). Survey reconstruction uses **Minimum Curvature** as documented by ISCWSA. Results are **not** claimed bit-identical to WinSERVE.
+Offline Windows field app and public browser demo for directional borehole survey calculation (Minimum Curvature / ISCWSA). Results are **not** claimed bit-identical to WinSERVE.
 
-Current evaluation build: **0.1.1**.
+License: **Apache-2.0**. Current evaluation build: **0.1.1**.
+
+Public demo (planned): `https://delvepath.mithrilconsulting.io`
 
 ## What this build does
 
@@ -22,6 +26,7 @@ Current evaluation build: **0.1.1**.
 - Glossary tips that stay on screen; Start Here walkthrough
 - Demos: Oregon 24c-23-65 (public WinSERVE); **Load dual-lateral example** (synthetic / constructed)
 - CSV export and a printable report
+- Browser demo: the same `delve-core` engine via WebAssembly; IndexedDB projects; `.delvepath.json` snapshots (not desktop SQLite)
 
 ## What it does not do
 
@@ -53,12 +58,22 @@ $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm run tauri dev
 ```
 
-Core / golden tests (no UI):
+Browser demo (no Tauri):
+
+```text
+npm run build:wasm
+npm run dev
+```
+
+Then open `http://localhost:1420/`. Set `VITE_DESKTOP_DOWNLOAD_URL` in `.env.local` to the approved Google Drive folder when you have one. See `.env.example`.
+
+Core / golden / UI tests:
 
 ```text
 npm run test-core
 npm run test-golden
 npm run test-ui
+npm run test-license
 ```
 
 ## Offline

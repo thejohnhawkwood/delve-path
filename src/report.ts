@@ -30,7 +30,9 @@ export function printReport(
   </style></head><body>
   <h1>DelvePath survey report</h1>
   <div class="warn">Engineering prototype / evaluation software — not certified.
-  Not for collision avoidance or steering. Minimum Curvature (ISCWSA). Not claimed bit-identical to WinSERVE.</div>
+  Not regulator-approved. Not for collision avoidance, well control, or steering decisions.
+  Minimum Curvature (ISCWSA). Not claimed bit-identical to WinSERVE.</div>
+  <p>Created by Philip Bird — Mithril Consulting</p>
   <p>${escapeHtml(projectName)} / ${escapeHtml(holeName)} · ${unit} · oilfield from vertical ·
   azimuth ${traj.azimuth_reference} · VSP ${fmt(traj.vsp_deg)}°</p>
   <table>

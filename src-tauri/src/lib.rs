@@ -3,9 +3,7 @@ use delve_core::{
     MeasuredStation, StationClass, StationSource, SurveyConvention, TieIn, Trajectory, UnitSystem,
     ValidationIssue,
 };
-use delve_storage::{
-    new_id, HoleRecord, ProjectRecord, StationRecord, Store, TargetRecord,
-};
+use delve_storage::{new_id, HoleRecord, ProjectRecord, StationRecord, Store, TargetRecord};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -138,7 +136,11 @@ fn save_hole(state: State<AppState>, hole: HoleRecord) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_stations(state: State<AppState>, hole_id: String, stations: Vec<StationRecord>) -> Result<(), String> {
+fn save_stations(
+    state: State<AppState>,
+    hole_id: String,
+    stations: Vec<StationRecord>,
+) -> Result<(), String> {
     let guard = state.store.lock().unwrap();
     let store = guard.as_ref().ok_or("No project open")?;
     store

@@ -5,9 +5,7 @@
 //! standard algebraic form of that circular arc.
 //! See docs/CALCULATION_SPEC.md.
 
-use crate::types::{
-    CalculatedStation, HoleCalcInput, MeasuredStation, StationClass, Trajectory,
-};
+use crate::types::{CalculatedStation, HoleCalcInput, MeasuredStation, StationClass, Trajectory};
 use crate::units::{
     deg_to_rad, dls_to_display, ft_to_m, m_to_ft, rad_to_deg, DlsDisplay, UnitSystem,
 };
@@ -34,12 +32,7 @@ fn unit_tangent(inc_rad: f64, azi_rad: f64) -> Vec3 {
 }
 
 fn dogleg_and_rf(v1: Vec3, v2: Vec3) -> (f64, f64) {
-    let mut cos_b = v1.n * v2.n + v1.e * v2.e + v1.t * v2.t;
-    if cos_b > 1.0 {
-        cos_b = 1.0;
-    } else if cos_b < -1.0 {
-        cos_b = -1.0;
-    }
+    let cos_b = (v1.n * v2.n + v1.e * v2.e + v1.t * v2.t).clamp(-1.0, 1.0);
     let beta = cos_b.acos();
     let rf = if beta < SMALL_BETA_RAD {
         1.0

@@ -40,7 +40,12 @@ fn load_expected(path: &std::path::Path) -> Vec<Row> {
         .flexible(true)
         .from_path(path)
         .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let headers: Vec<String> = rdr.headers().unwrap().iter().map(|s| s.to_string()).collect();
+    let headers: Vec<String> = rdr
+        .headers()
+        .unwrap()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     let idx = |name: &str| headers.iter().position(|h| h == name);
     let mut rows = Vec::new();
     for rec in rdr.records() {
@@ -82,7 +87,12 @@ struct Diffs {
     dls: f64,
 }
 
-fn compare(name: &str, traj: &Trajectory, expected: &[Row], skip_last_if: impl Fn(&Row) -> bool) -> Diffs {
+fn compare(
+    name: &str,
+    traj: &Trajectory,
+    expected: &[Row],
+    skip_last_if: impl Fn(&Row) -> bool,
+) -> Diffs {
     let mut d = Diffs {
         n: 0,
         tvd: 0.0,
@@ -174,9 +184,12 @@ fn oregon_winserve_golden() {
     let rows = load_expected(&path);
     let input = input_from_rows(&rows, 165.30);
     let traj = calculate_trajectory(&input).expect("oregon calc");
-    let body = compare("OREGON WINSERVE GOLDEN (through plug-back)", &traj, &rows, |r| {
-        r.md > 1848.0
-    });
+    let body = compare(
+        "OREGON WINSERVE GOLDEN (through plug-back)",
+        &traj,
+        &rows,
+        |r| r.md > 1848.0,
+    );
     let tol_len = 0.02;
     let tol_dls = 0.02;
     assert!(body.tvd <= tol_len, "TVD {0} > {tol_len}", body.tvd);
@@ -187,20 +200,29 @@ fn oregon_winserve_golden() {
 
     // MD 2591 is 743 ft after the plug-back interpolated point. Engine unchanged;
     // see docs/CALCULATION_SPEC.md investigation note.
-    let last = compare("OREGON LAST INTERVAL AFTER PLUG-BACK", &traj, &rows, |r| r.md <= 1848.0);
+    let last = compare("OREGON LAST INTERVAL AFTER PLUG-BACK", &traj, &rows, |r| {
+        r.md <= 1848.0
+    });
     assert!(last.tvd <= 0.02, "last TVD {}", last.tvd);
     assert!(last.ew <= 0.02, "last E {}", last.ew);
     assert!(last.dls <= 0.02, "last DLS {}", last.dls);
-    assert!(last.ns <= 0.04, "last N {} (post plug-back long interval)", last.ns);
-    assert!(last.vs <= 0.04, "last VS {} (post plug-back long interval)", last.vs);
+    assert!(
+        last.ns <= 0.04,
+        "last N {} (post plug-back long interval)",
+        last.ns
+    );
+    assert!(
+        last.vs <= 0.04,
+        "last VS {} (post plug-back long interval)",
+        last.vs
+    );
 }
 
 #[test]
 fn nm_9461_winserve_high_angle_golden() {
     let root = repo_root();
-    let path = root.join(
-        "research/golden/fixtures/winserve_nm_3003929461_jicarilla452-08-31_expected.csv",
-    );
+    let path = root
+        .join("research/golden/fixtures/winserve_nm_3003929461_jicarilla452-08-31_expected.csv");
     let rows = load_expected(&path);
     let input = input_from_rows(&rows, 86.10);
     let traj = calculate_trajectory(&input).expect("nm9461 calc");
@@ -219,9 +241,8 @@ fn nm_9461_winserve_high_angle_golden() {
 #[test]
 fn compass_plan_excerpt() {
     let root = repo_root();
-    let path = root.join(
-        "research/golden/fixtures/compass_nm_3001555969_waterbuffalo131h_plan_page12.csv",
-    );
+    let path = root
+        .join("research/golden/fixtures/compass_nm_3001555969_waterbuffalo131h_plan_page12.csv");
     let rows = load_expected(&path);
     let input = input_from_rows(&rows, 80.79);
     let traj = calculate_trajectory(&input).expect("compass calc");

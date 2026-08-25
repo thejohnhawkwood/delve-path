@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: DelvePath
+message: If you use this software, please cite it using these metadata.
+type: software
+authors:
+  - family-names: Bird
+    given-names: Philip
+    affiliation: Mithril Consulting
+abstract: >-
+  Offline and browser Minimum Curvature borehole survey reconstruction.
+  Engineering prototype / evaluation software — not certified.
+license: Apache-2.0
+repository-code: https://github.com/thejohnhawkwood/delve-path
+version: 0.1.1
+date-released: "2026-08-24"
+keywords:
+  - directional drilling
+  - minimum curvature
+  - survey calculation
+  - wellbore positioning

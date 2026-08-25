@@ -8,6 +8,7 @@ interface Props {
   onGoTab: (tab: "plan" | "profile" | "3d" | "target") => void;
   tipsOn: boolean;
   onTips: (on: boolean) => void;
+  runtime?: "tauri" | "browser";
 }
 
 const STEPS: { title: string; body: string; action?: "oregon" | "dual" | "target" | "plan" | "profile" | "3d" }[] = [
@@ -17,7 +18,7 @@ const STEPS: { title: string; body: string; action?: "oregon" | "dual" | "target
   },
   {
     title: "Files",
-    body: "New creates a local *.delvepath project (SQLite). Open reloads one. Save and autosave keep the hole. That is DelvePath’s job file — not a WinSERVE .SVY. Import CSV to bring in MD/INC/AZI from a spreadsheet. Export CSV / Report leave with calculated TVD, N, E, VS, and a class column so projections stay labelled.",
+    body: "Desktop New/Open uses a local *.delvepath SQLite file. The browser demo saves to IndexedDB on this device and can export a .delvepath.json snapshot — that JSON is not a desktop SQLite file. Import CSV for MD/INC/AZI. Export CSV / Report include calculated TVD, N, E, VS, and a class column so projections stay labelled.",
   },
   {
     title: "Load the Oregon example",
@@ -49,7 +50,7 @@ const STEPS: { title: string; body: string; action?: "oregon" | "dual" | "target
   },
 ];
 
-export function StartHere({ onClose, onLoadOregon, onLoadDual, onSampleTarget, onGoTab, tipsOn, onTips }: Props) {
+export function StartHere({ onClose, onLoadOregon, onLoadDual, onSampleTarget, onGoTab, tipsOn, onTips, runtime }: Props) {
   const [i, setI] = useState(0);
   const step = STEPS[i];
 
@@ -77,7 +78,11 @@ export function StartHere({ onClose, onLoadOregon, onLoadDual, onSampleTarget, o
         <p className="modal-step">
           {i + 1} / {STEPS.length} — {step.title}
         </p>
-        <p>{step.body}</p>
+        <p>
+          {step.title === "Files" && runtime === "browser"
+            ? "This browser tab stores projects in IndexedDB on your device (not uploaded). Export project writes a .delvepath.json snapshot — not a desktop SQLite *.delvepath file. Import CSV for MD/INC/AZI. Export CSV / Report include calculated columns and a class label for projections."
+            : step.body}
+        </p>
         {step.action === "oregon" && (
           <button className="primary" onClick={runAction}>
             Load Oregon example

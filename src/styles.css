@@ -189,6 +189,22 @@ table.survey button.row-x:hover { color: var(--red); }
   padding: 6px 10px; border-top: 1px solid var(--line); background: var(--chrome);
 }
 
+@media (max-width: 1100px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+  .pos, .issues, .grid-panel, .viz { grid-column: 1; }
+  .viz { min-height: 360px; }
+  .kv { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .toolbar { align-items: flex-start; }
+  html, body, #root { height: auto; min-height: 100%; }
+  .app { height: auto; }
+}
+
 .tip {
   border-bottom: 1px dotted #6a655c;
   cursor: help;

@@ -11,6 +11,9 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+playwright-report/
+test-results/
+sbom/
 *.pem
 *.key
 credentials.json

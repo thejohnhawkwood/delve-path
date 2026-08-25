@@ -26,7 +26,11 @@ fn run(stations: Vec<MeasuredStation>, vsp: f64, tie: TieIn) -> Trajectory {
 #[test]
 fn l1_vertical() {
     let t = run(
-        vec![st(0.0, 0.0, 123.0), st(100.0, 0.0, 123.0), st(250.0, 0.0, 40.0)],
+        vec![
+            st(0.0, 0.0, 123.0),
+            st(100.0, 0.0, 123.0),
+            st(250.0, 0.0, 40.0),
+        ],
         0.0,
         TieIn {
             tvd: 0.0,
@@ -85,7 +89,11 @@ fn l1_azimuth_wrap() {
         },
     );
     // 2° azimuth change at 10° inc is a small dogleg, not ~358°.
-    assert!(t.stations[1].dogleg_deg < 3.0, "dogleg {}", t.stations[1].dogleg_deg);
+    assert!(
+        t.stations[1].dogleg_deg < 3.0,
+        "dogleg {}",
+        t.stations[1].dogleg_deg
+    );
     assert!(t.stations[1].dogleg_deg > 0.1);
 }
 

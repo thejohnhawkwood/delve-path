@@ -2,6 +2,7 @@
 name = "delvepath"
 version = "0.1.1"
 edition.workspace = true
+license.workspace = true
 
 [lib]
 name = "delvepath_lib"

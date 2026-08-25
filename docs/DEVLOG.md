@@ -214,3 +214,15 @@ Repo had only the GitHub `Initial commit`. This land adds the Tauri/React/Rust p
 - **Undo add** plus **×** on active-hole rows (last row kept).
 - Copy row (⎘ or Ctrl+C unless a cell has a text selection): MD/INC/AZI/comment plus calculated N/E/TVD. Grid paste still treats the first three columns as a station. Target tab paste fills N/E/TVD (or three numbers). Does not replace the survey.
 - README and `EVALUATION.txt` updated for evaluation **0.1.1**. Status: **WORKING**. Desktop copy/paste in the Tauri shell **NOT YET VALIDATED** as a formal test.
+
+---
+
+# DEVLOG — browser demo + WASM engine
+
+**2026-08-24**
+
+- Added `crates/delve-wasm` (`wasm-bindgen` 0.2.104) exposing calculate / validate / tangent MD / TVD / bit. `delve-core` stays pure.
+- Frontend platform adapters: Tauri+SQLite vs browser WASM+IndexedDB. UI no longer exits calculation when Tauri is absent.
+- Public static site shell for `delvepath.mithrilconsulting.io`: lockup, live demo workspace, trust/legal, Apache-2.0 package.
+- Browser projects persist in IndexedDB (schema v1), export/import `.delvepath.json` (not desktop SQLite).
+- Windows Drive folder URL is `VITE_DESKTOP_DOWNLOAD_URL` — unset, download action disabled. Status: **WORKING** locally; public deploy **BLOCKED** on owner DNS/Netlify/Drive/visibility steps.
