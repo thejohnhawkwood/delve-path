@@ -15,6 +15,7 @@ export interface ExtraPath {
   opacity?: number;
   view?: ChartTab;
   fill?: boolean;
+  marker?: boolean;
   mesh?: { vertices: [number, number, number][]; triangles: [number, number, number][] };
   points: { north: number; east: number; tvd: number; vs?: number }[];
 }
@@ -85,7 +86,6 @@ export function Charts({
   const hasTarget = targets.some((t) => !isJunctionTarget(t, targets));
 
   const legendItems: { color: string; label: string }[] = [
-    ...paths.map((h) => ({ color: h.color, label: h.name })),
     ...(projected.length ? [{ color: "#c9a227", label: "PROJECTED" }] : []),
     ...(hasKick ? [{ color: "#e0c36a", label: "Kick-off" }] : []),
     ...(hasJunction ? [{ color: "#e0c36a", label: "Junction" }] : []),
@@ -251,11 +251,12 @@ export function Charts({
           hovertemplate: `${p.name}<extra></extra>`, flatshading: false,
         }) : ({
           type: "scatter3d",
-          mode: "lines",
+          mode: p.marker ? "markers" : "lines",
           x: p.points.map((q) => q.east),
           y: p.points.map((q) => q.north),
           z: p.points.map((q) => q.tvd),
           name: p.name,
+          marker: { color: p.color, size: 6 },
           line: { color: p.color, width: p.width ?? 5, dash: p.dash ?? "dash" },
           opacity: p.opacity ?? 1,
         })),
@@ -274,15 +275,17 @@ export function Charts({
       const largest = Math.max(spans.x,spans.y,spans.z);
       const layout3d = {
         ...layoutBase,
+        margin: { t: 28, r: 8, b: 12, l: 8 },
         title: { text: "3-D  +N / +E / TVD down", font: { size: 12 } },
         scene: {
           domain: { x: [0, 1], y: [0, 1] },
-          xaxis: { title: `East ${unitLabel}`, range: bounds.east, autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
-          yaxis: { title: `North ${unitLabel}`, range: bounds.north, autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
-          zaxis: { title: `TVD ${unitLabel}`, range: [...bounds.tvd].reverse(), autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
+          xaxis: { title: `East ${unitLabel}`, nticks: 4, range: bounds.east, autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
+          yaxis: { title: `North ${unitLabel}`, nticks: 4, range: bounds.north, autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
+          zaxis: { title: `TVD ${unitLabel}`, nticks: 4, range: [...bounds.tvd].reverse(), autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
           aspectmode: "manual",
-          camera: { eye: { x: 1.5, y: 1.5, z: 1.5 } },
-          aspectratio: {x:spans.x/largest,y:spans.y/largest,z:spans.z/largest},
+          camera: { eye: { x: 1.65, y: 1.65, z: 1.45 }, projection: { type: "orthographic" } },
+          // A common multiplier fills the viewport without stretching any axis.
+          aspectratio: {x:1.55*spans.x/largest,y:1.55*spans.y/largest,z:1.55*spans.z/largest},
           uirevision: JSON.stringify(focusBounds ?? "overview"),
           bgcolor: "#1b1d21",
         },
@@ -577,7 +580,8 @@ function branchMark2d(x: number, y: number, name: string, pick?: PickPoint) {
 }
 
 function extraLine2d(x: number[], y: number[], p: ExtraPath) {
-  return { type: "scatter", mode: "lines", x, y, name: p.name,
+  return { type: "scatter", mode: p.marker ? "markers" : "lines", x, y, name: p.name,
+    marker: { color: p.color, size: 10 },
     line: { color: p.color, width: p.width ?? 2.5, dash: p.dash ?? "dash" },
     opacity: p.opacity ?? 1, fill: p.fill ? "toself" : undefined,
   };

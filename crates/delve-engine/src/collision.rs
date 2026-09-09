@@ -9,7 +9,7 @@ use delve_core::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const METHOD: &str = "delvepath/bezier-envelope-screen/1";
+pub const METHOD: &str = "delvepath/bezier-envelope-screen/2";
 pub const NOTICE: &str = "Engineering prototype / evaluation software — not certified. Not regulator-approved. Not for collision avoidance, well control, or steering decisions.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +56,10 @@ pub struct OffsetPath {
     pub frame: CoordinateFrame,
     /// Explicit polyline geometry; no implied minimum-curvature reconstruction.
     pub points: Vec<SurveyPoint>,
+    /// Maximum distance from this polyline to the reconstructed offset curve.
+    /// Zero denotes explicitly supplied straight segments (legacy case format).
+    #[serde(default)]
+    pub chord_error_bound: f64,
     pub radius: f64,
     pub envelope: Envelope,
 }
@@ -217,6 +221,8 @@ pub fn validate(c: &Case) -> Result<(), String> {
             .map_err(|e| format!("Offset {} frame: {e:?}", off.name))?;
         if !off.radius.is_finite()
             || off.radius < 0.0
+            || !off.chord_error_bound.is_finite()
+            || !(0.0..=0.1).contains(&(off.chord_error_bound * scale))
             || off.points.len() < 2
             || off.points.len() > 2000
             || !off.points.iter().all(valid_point)
@@ -447,7 +453,7 @@ fn encounter(
         reference_envelope_radius: rr,
         offset_envelope_radius: ro,
         required_distance: required,
-        clearance_lower_bound: best.0 - required - c.chord_tolerance,
+        clearance_lower_bound: best.0 - required - c.chord_tolerance - off.chord_error_bound,
         directional_support_gap: directional,
     })
 }
@@ -502,6 +508,34 @@ fn candidate(c: &Case, id: String, right: f64, high: f64) -> Result<Candidate, S
 pub fn analyze(c: &Case) -> Result<Candidate, String> {
     validate(c)?;
     candidate(c, "uncorrected".into(), 0.0, 0.0)
+}
+
+/// Screen the explicitly supplied forecast polyline, not a regenerated endpoint curve.
+/// This says nothing about unprovided curvature between its sampled points.
+pub fn screen_forecast(c: &Case, points: &[SurveyPoint]) -> Result<Vec<Encounter>, String> {
+    validate(c)?;
+    if points.len() < 2
+        || points.len() > 2000
+        || points.iter().any(|p| !valid_point(p))
+        || points.windows(2).any(|w| w[1].md <= w[0].md)
+    {
+        return Err(err(
+            "Forecast needs 2–2000 finite points with increasing MD.",
+        ));
+    }
+    if points[0].pos().sub(c.start.pos()).norm() > 1e-6
+        || (points[0].md - c.start.md).abs() > 1e-6
+        || points.last().unwrap().pos().sub(c.target.pos()).norm() > 1e-6
+    {
+        return Err(err(
+            "Forecast must match the active bit and chosen endpoint.",
+        ));
+    }
+    let k = chi2_k(3, c.confidence).map_err(|e| e.to_string())?;
+    c.offsets
+        .iter()
+        .map(|off| encounter(c, points, off, k))
+        .collect()
 }
 pub fn generate(c: &Case) -> Result<Generation, String> {
     validate(c)?;
@@ -605,6 +639,7 @@ pub fn demo() -> Case {
                     p(2460.0, 300.0, 180.0, 2001.0, 90.0, 90.0),
                 ],
                 radius: 0.1778,
+                chord_error_bound: 0.0,
                 envelope: envelope.clone(),
             },
             OffsetPath {
@@ -616,6 +651,7 @@ pub fn demo() -> Case {
                     p(2900.0, 700.0, 0.0, 2026.0, 90.0, 0.0),
                 ],
                 radius: 0.1778,
+                chord_error_bound: 0.0,
                 envelope,
             },
         ],
@@ -630,6 +666,31 @@ pub fn demo() -> Case {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn offset_curve_error_reduces_the_clearance_bound() {
+        let mut c = demo();
+        let before = analyze(&c).unwrap().encounters[0].clearance_lower_bound;
+        c.offsets[0].chord_error_bound = 0.03;
+        let after = analyze(&c).unwrap().encounters[0].clearance_lower_bound;
+        assert!((before - after - 0.03).abs() < 1e-10);
+        c.offsets[0].chord_error_bound = -1.0;
+        assert!(analyze(&c).is_err());
+    }
+
+    #[test]
+    fn forecast_screen_uses_supplied_path_and_rejects_a_different_anchor() {
+        let c = demo();
+        let baseline = analyze(&c).unwrap();
+        let encounters = screen_forecast(&c, &baseline.points).unwrap();
+        assert!((encounters[0].distance - 1.0).abs() < 1e-8);
+        let corrected = candidate(&c, "offset".into(), 0.0, 15.0).unwrap();
+        let clear = screen_forecast(&c, &corrected.points).unwrap();
+        assert!(clear[0].distance > encounters[0].distance);
+        let mut wrong = corrected.points;
+        wrong[0].north += 1.0;
+        assert!(screen_forecast(&c, &wrong).is_err());
+    }
 
     #[test]
     fn metric_and_imperial_describe_the_same_correction() {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AboutDialog } from "./AboutDialog";
 import {
   appVersion,
@@ -32,10 +32,16 @@ function DownloadAction({ className }: { className?: string }) {
 
 export function SiteApp() {
   const [about, setAbout] = useState(false);
+  const [working, setWorking] = useState(() => location.hash === "#workspace");
+  useEffect(() => {
+    const change = () => setWorking(location.hash === "#workspace");
+    window.addEventListener("hashchange", change);
+    return () => window.removeEventListener("hashchange", change);
+  }, []);
   const hasDownload = Boolean(desktopDownloadUrl);
 
   return (
-    <div className="site">
+    <div className={"site" + (working ? " site-working" : "")}>
       <a className="skip-link" href="#workspace">
         Skip to live demo
       </a>
@@ -129,13 +135,14 @@ export function SiteApp() {
           <h2>Guided demo</h2>
           <p>
             Use <strong>Start here</strong>, then load Oregon, the dual-lateral, or{" "}
-            <strong>Curve Recovery — Plan & Flight Deck</strong>. Reveal the held-out synthetic
-            survey to score frozen forecasts. Open <strong>Anti-collision</strong> and select <strong>Generate drill path</strong> to explore the constructed crossing-lateral case and inspect its calculation audit. Projected stations stay labelled{" "}
+            <strong>Curve Recovery — Plan & Flight Deck</strong>. Click a forecast card to change the cyan path.
+            Continue to <strong>Uncertainty</strong> to place a position-error region, then <strong>Anti-collision</strong> to check the nearby holes. Load the crossing example, use the active hole, and generate a correction. Projected stations stay labelled{" "}
             <strong>PROJECTED</strong>.
           </p>
         </section>
 
         <section className="workspace-section" id="workspace" aria-label="DelvePath workspace">
+          {working && <a className="workspace-back" href="#top">← About DelvePath · leave workspace</a>}
           <Suspense fallback={<p className="workspace-loading">Loading calculation workspace…</p>}>
             <App />
           </Suspense>
@@ -145,7 +152,7 @@ export function SiteApp() {
           <h2>What this demonstrates</h2>
           <ul>
             <li>Minimum Curvature survey reconstruction from measured MD / INC / AZI.</li>
-            <li>Planning constructors, Flight Deck scenarios, and BHA Memory held-out scoring.</li>
+            <li>Selectable Flight Deck forecasts linked to surveys, uncertainty and nearby-hole clearance.</li>
             <li>True target footprints, centerline screening, and typed depth datums.</li>
             <li>Layered anti-collision evaluation: explicit uncertainty envelopes, bounded geometric candidates, and reproducible audit export. No operational steering commands.</li>
             <li>One Rust engine family (`delve-core`, `delve-planning`, `delve-assurance`) for desktop and browser. No second TypeScript solver.</li>

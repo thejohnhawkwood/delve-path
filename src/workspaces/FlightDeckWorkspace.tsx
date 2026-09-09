@@ -1,536 +1,163 @@
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { engineCall, parseEngineError } from "../engine";
-import { fmt, lengthLabel, type ReviewState, type UnitSystem } from "../domain";
-import { openReport, shiftCardModel } from "../reportModel";
+import { fmt, lengthLabel, dlsLabel, type UnitSystem } from "../domain";
+import { getPlatform } from "../platform";
 import type { ExtraPath } from "../Charts";
+import type { Point } from "../collision/types";
+import type { FlightSelection } from "../fieldModel";
 
-interface DemoSurvey {
-  md: number;
-  inc_deg: number;
-  azi_deg: number;
-  accepted: boolean;
+export interface RecoveryDemo {
+  name: string; mark: string;
+  surveys: { md: number; inc_deg: number; azi_deg: number; accepted: boolean }[];
+  plan: { stations: Point[] };
 }
-
-interface Attitude {
-  md: number;
-  inc_deg: number;
-  azi_deg: number;
-  north: number;
-  east: number;
-  tvd: number;
+interface Card {
+  input: { id: string; name: string; added_md: number };
+  future_bit: Point; next_sensor: Point; path: Point[];
+  max_dls: number; slide_footage: number; ud: number | null; lr: number | null;
+  constraint_feasible: boolean; violations: string[]; assumptions: string[];
 }
+const defaults = (unit: UnitSystem) => unit === "imperial"
+  ? { lag: "52", stand: "93", slide: "28", yield: "8", tf: "270", max: "12" }
+  : { lag: "15", stand: "30", slide: "9", yield: "8", tf: "270", max: "12" };
 
-interface PathPoint extends Attitude {
-  dls_display?: number;
-}
-
-interface ScenarioInput {
-  id: string;
-  name: string;
-  method: string;
-  added_md: number;
-  dls_display?: number | null;
-  toolface_deg?: number | null;
-  slide_yield?: number | null;
-  segments: {
-    mode: string;
-    length: number;
-    toolface_deg: number;
-    slide_yield_dls: number;
-    rotary_dls: number;
-    rotary_tf_deg: number;
-    dls_ref: string;
-  }[];
-}
-
-interface ScenarioCard {
-  input: ScenarioInput;
-  future_bit_md: number;
-  next_sensor_md: number;
-  future_bit: PathPoint;
-  next_sensor: PathPoint;
-  path: PathPoint[];
-  ud?: number | null;
-  lr?: number | null;
-  max_dls: number;
-  avg_dls: number;
-  slide_footage: number;
-  constraint_feasible: boolean;
-  violations: string[];
-  assumptions: string[];
-}
-
-interface Demo {
-  name: string;
-  mark: string;
-  surveys: DemoSurvey[];
-  held_out: DemoSurvey;
-  last_accepted: Attitude;
-  bha: {
-    name: string;
-    configuration_revision: number;
-    sensor_to_bit: number;
-    slide_yield_nom: number;
-    slide_yield_low: number;
-    slide_yield_high: number;
-  };
-  memory: {
-    qualified_count: number;
-    median_slide_yield?: number | null;
-    sample_ids: string[];
-    samples: { id: string; included: boolean; reason: string }[];
-  };
-  segments: {
-    id: string;
-    start_bit_md: number;
-    end_bit_md: number;
-    mode: string;
-    started_at?: string;
-    ended_at?: string;
-  }[];
-  constraints: {
-    stand_length: number;
-    max_slide_per_stand: number;
-    min_useful_slide: number;
-    max_dls: number;
-    max_yield: number;
-  };
-  corridor: { up_down: number; left_right: number };
-  scenarios: ScenarioInput[];
-  plan: {
-    stations: { md: number; inc_deg: number; azi_deg: number; north: number; east: number; tvd: number }[];
-    status: string;
-  };
-}
-
-const SCENARIO_COLORS = ["#c9a227", "#7ee0e0", "#d08a4a", "#b48ec8", "#8ec8a0"];
-
-export function FlightDeckWorkspace({
-  unit,
-  latestAccepted,
-  holeId,
-  vspDeg,
-  onDemoLoaded,
-  onPaths,
-  onDocuments,
-}: {
-  unit: UnitSystem;
-  latestAccepted: ReviewState | undefined;
-  holeId: string;
-  vspDeg: number;
-  onDemoLoaded: (demo: Demo) => void;
-  onPaths: (paths: ExtraPath[]) => void;
-  onDocuments: (docs: { kind: string; payload: unknown }[]) => void;
+export function FlightDeckWorkspace({ unit, sensor, modelKey, holeName, plan, onDemoLoaded, onUpdate, onNavigate }: {
+  unit: UnitSystem; sensor: Point | null; modelKey: string; holeName: string; plan: Point[];
+  onDemoLoaded: (demo: RecoveryDemo) => Promise<void>;
+  onUpdate: (paths: ExtraPath[], selection: FlightSelection | null) => void;
+  onNavigate: (workspace: "survey" | "eou" | "collision") => void;
 }) {
-  const [demo, setDemo] = useState<Demo | null>(null);
-  const [cards, setCards] = useState<ScenarioCard[]>([]);
-  const [estimate, setEstimate] = useState<{
-    derived_bit_md: number;
-    next_expected_sensor_md: number;
-    bit: Attitude;
-    path: PathPoint[];
-  } | null>(null);
-  const [footage, setFootage] = useState<{ slide: number; rotate: number; slide_pct: number; elapsed_hours: number | null } | null>(
-    null
-  );
-  const [slideLen, setSlideLen] = useState("28");
-  const [tf, setTf] = useState("270");
-  const [revealed, setRevealed] = useState(false);
-  const [scores, setScores] = useState<
-    { name: string; miss_3d: number; inc_residual_deg: number; azi_residual_deg: number; md_difference: number }[]
-  >([]);
-  const [err, setErr] = useState("");
-  const [memoryAfter, setMemoryAfter] = useState<number | null>(null);
-  const [help, setHelp] = useState("");
+  const [values, setValues] = useState(() => defaults(unit));
+  const [cards, setCards] = useState<Card[]>([]);
+  const [estimate, setEstimate] = useState<{ bit: Point; path: Point[] } | null>(null);
+  const [selected, setSelected] = useState("custom");
+  const [requested, setRequested] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [resultKey, setResultKey] = useState("");
+  const revision = useRef(0);
   const len = lengthLabel(unit);
+  const key = JSON.stringify([modelKey, values, plan]);
+  const ready = resultKey === key;
+  const chosen = ready ? cards.find(c => c.input.id === selected) : undefined;
+  useEffect(() => { setValues(defaults(unit)); }, [unit]);
 
-  const accepted = useMemo(() => demo?.surveys.filter((s) => s.accepted).slice(-1)[0], [demo]);
+  useEffect(() => {
+    const run = ++revision.current;
+    setError(""); setBusy(false); setCards([]); setEstimate(null);
+    onUpdate([], null);
+    if (!requested || !sensor) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setBusy(true);
+        try {
+          const { lag, stand, slide, yield: response, tf, max } = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim() === "" ? NaN : Number(v)]));
+          if (![lag, stand, slide, response, tf, max].every(Number.isFinite) || lag < 0 || stand <= 0 || stand < lag || slide < 0 || slide > stand || response < 0 || max <= 0 || tf < 0 || tf > 360)
+            throw new Error("Enter valid lengths: next interval must cover sensor-to-bit distance; slide must be between zero and the interval length. Toolface is 0–360°. Curvature limit must be positive.");
+          const proj = lag > 0 ? await engineCall<{ points: Point[] }>("project_hold", { start: sensor, added_md: lag, unit, class: "projected" }) : { points: [sensor] };
+          const bit = proj.points.slice(-1)[0]!;
+          const bha = {
+            id: "field-bha", hole_id: holeName, name: "Entered motor response", configuration_revision: 1,
+            start_md: sensor.md, end_md: null, motor_id: "", motor_model: "", bend_setting: "", bit_size: 0, hole_size: 0,
+            sensor_to_bit: lag, hole_section: "", formation_tag: "", toolface_basis: "gravity",
+            slide_yield_low: response, slide_yield_nom: response, slide_yield_high: response,
+            rotary_dls: 0, rotary_tf_deg: 0, yield_ref: unit === "imperial" ? "per100_ft" : "per30_m",
+            notes: "Hold last survey attitude to bit. Zero rotary tendency. User-entered slide response.",
+          };
+          let reference: Point | null = null;
+          if (plan.length > 1 && bit.md + stand >= plan[0].md && bit.md + stand <= plan.slice(-1)[0]!.md) {
+            reference = await engineCall<Point>("evaluate_at_md", { md: bit.md + stand, input: {
+              unit_system: unit, convention: "oilfield_from_vertical", azimuth_reference: "unknown", vsp_deg: 0,
+              tie_in: plan[0], stations: plan.map(p => ({ ...p, class: "planned", source: "manual", comment: "Comparison plan" })),
+            } });
+          }
+          const next: Card[] = [];
+          const unavailable: string[] = [];
+          for (const [id, name, footage, yieldValue] of [
+            ["hold", "Hold direction", 0, 0],
+            ["custom", "Your slide then rotate", slide, response],
+            ["gentle", "Longer, gentler slide", Math.min(stand, slide * 2), slide * 2 <= stand ? response / 2 : response * slide / stand],
+          ] as const) {
+            const segments = [
+              ...(footage > 0 ? [{ mode: "slide", length: footage, toolface_deg: tf, slide_yield_dls: yieldValue, rotary_dls: 0, rotary_tf_deg: 0, dls_ref: bha.yield_ref }] : []),
+              ...(stand > footage ? [{ mode: "rotate", length: stand - footage, toolface_deg: 0, slide_yield_dls: 0, rotary_dls: 0, rotary_tf_deg: 0, dls_ref: bha.yield_ref }] : []),
+            ];
+            try { next.push(await engineCall<Card>("flight_scenario", {
+              start_bit: bit, bha, input: { id, name, method: id === "hold" ? "hold" : "slide_rotate", added_md: stand, slide_yield: yieldValue, segments },
+              plan: reference, corridor: null, constraints: { stand_length: stand, max_slide_per_stand: stand, min_useful_slide: 0, max_dls: max, max_yield: max }, unit,
+            })); } catch (e) {
+              if (id === "hold") throw e;
+              unavailable.push(name + ": " + parseEngineError(e));
+            }
+          }
+          if (run !== revision.current) return;
+          setEstimate({ bit, path: [sensor, ...proj.points] }); setCards(next); setResultKey(key);
+          if (!next.some(c => c.input.id === selected)) setSelected("hold");
+          setError(unavailable.join(" "));
+        } catch (e) { if (run === revision.current) setError(parseEngineError(e)); }
+        finally { if (run === revision.current) setBusy(false); }
+      })();
+    }, 200);
+    return () => { window.clearTimeout(timer); revision.current++; };
+  }, [key, requested, sensor, unit, holeName, onUpdate]);
 
-  function vs(n: number, e: number) {
-    const th = (vspDeg * Math.PI) / 180;
-    return n * Math.cos(th) + e * Math.sin(th);
-  }
-
-  function asPath(name: string, color: string, dash: ExtraPath["dash"], pts: PathPoint[]): ExtraPath {
-    return {
-      name,
-      color,
-      dash,
-      points: pts.map((q) => ({ north: q.north, east: q.east, tvd: q.tvd, vs: vs(q.north, q.east) })),
-    };
-  }
+  useEffect(() => {
+    if (!chosen || !estimate || !sensor) return;
+    const hold = cards.find(c => c.input.id === "hold")!;
+    const paths: ExtraPath[] = [
+      { name: "ESTIMATED · survey to bit (hold direction)", layer: "Estimated bit", color: "#e6b35a", dash: "dot", points: estimate.path },
+      ...(chosen.input.id !== "hold" ? [{ name: "SCENARIO · Hold direction", layer: "Hold comparison", color: "#e6b35a", dash: "dash" as const, points: hold.path }] : []),
+      { name: "SCENARIO · " + chosen.input.name, layer: "Selected forecast", color: "#64d7d8", width: 7, points: chosen.path },
+      { name: "ESTIMATED · Bit now", layer: "Estimated bit", color: "#e6b35a", marker: true, points: [estimate.bit] },
+      { name: "SCENARIO · Next survey MD " + fmt(chosen.next_sensor.md) + " " + len, layer: "Selected forecast", color: "#e8e3f5", marker: true, points: [chosen.next_sensor] },
+    ];
+    onUpdate(paths, { id: chosen.input.id, name: chosen.input.name, sensor, bit: estimate.bit, estimatedPath: estimate.path, path: chosen.path, nextSensor: chosen.next_sensor, maxDls: chosen.max_dls, unit, modelKey });
+  }, [chosen, estimate, sensor, cards, unit, modelKey, len, onUpdate]);
 
   async function loadDemo() {
-    setErr("");
-    setRevealed(false);
-    setScores([]);
-    setMemoryAfter(null);
-    try {
-      const d = await engineCall<Demo>("curve_recovery_demo");
-      setDemo(d);
-      onDemoLoaded(d);
-      try {
-        const note = await engineCall<{ assumptions: string[]; applicability: string[] }>("method_help", {
-          method: "slide_rotate_segments",
-        });
-        setHelp(`${note.assumptions.join(" ")} ${note.applicability.join(" ")}`);
-      } catch {
-        setHelp("Ordered slide/rotate uses user-entered slide yield and rotary tendency.");
-      }
-      await evaluate(d, Number(slideLen), Number(tf));
-    } catch (e) {
-      setErr(parseEngineError(e));
-    }
+    setError("");
+    try { const demo = await engineCall<RecoveryDemo>("curve_recovery_demo"); await onDemoLoaded(demo); setValues(defaults("imperial")); setRequested(true); }
+    catch (e) { setError(parseEngineError(e)); }
   }
-
-  async function evaluate(d: Demo, slide: number, toolface: number) {
-    const sensor = d.last_accepted;
-    const est = await engineCall<{
-      derived_bit_md: number;
-      next_expected_sensor_md: number;
-      bit: Attitude;
-      path: PathPoint[];
-    }>("flight_estimate", {
-      sensor,
-      bha: d.bha,
-      segments: d.segments,
-      unit,
-    });
-    setEstimate(est);
-    const ft = await engineCall<{ slide: number; rotate: number; slide_pct: number; elapsed_hours: number | null }>(
-      "shift_card_footage",
-      { segments: d.segments }
-    );
-    setFootage(ft);
-    const planEnd = d.plan.stations.slice(-1)[0];
-    const extras: ScenarioInput[] = [
-      {
-        id: "nominal",
-        name: "Original nominal yield",
-        method: "slide_rotate",
-        added_md: 93,
-        slide_yield: d.bha.slide_yield_nom,
-        segments: [
-          {
-            mode: "slide",
-            length: slide,
-            toolface_deg: toolface,
-            slide_yield_dls: d.bha.slide_yield_nom,
-            rotary_dls: 0.3,
-            rotary_tf_deg: 90,
-            dls_ref: "per100_ft",
-          },
-          {
-            mode: "rotate",
-            length: 93 - slide,
-            toolface_deg: 0,
-            slide_yield_dls: d.bha.slide_yield_nom,
-            rotary_dls: 0.3,
-            rotary_tf_deg: 90,
-            dls_ref: "per100_ft",
-          },
-        ],
-      },
-      {
-        id: "memory",
-        name: "BHA Memory median (frozen)",
-        method: "slide_rotate",
-        added_md: 93,
-        slide_yield: d.memory.median_slide_yield ?? d.bha.slide_yield_nom,
-        segments: [
-          {
-            mode: "slide",
-            length: slide,
-            toolface_deg: toolface,
-            slide_yield_dls: d.memory.median_slide_yield ?? d.bha.slide_yield_nom,
-            rotary_dls: 0.3,
-            rotary_tf_deg: 90,
-            dls_ref: "per100_ft",
-          },
-          {
-            mode: "rotate",
-            length: 93 - slide,
-            toolface_deg: 0,
-            slide_yield_dls: d.memory.median_slide_yield ?? d.bha.slide_yield_nom,
-            rotary_dls: 0.3,
-            rotary_tf_deg: 90,
-            dls_ref: "per100_ft",
-          },
-        ],
-      },
-    ];
-    const scenarios = [
-      ...d.scenarios.map((s) => {
-        if (s.id !== "short") return s;
-        return {
-          ...s,
-          segments: s.segments.map((seg, i) =>
-            i === 0 ? { ...seg, length: slide, toolface_deg: toolface, slide_yield_dls: s.slide_yield ?? 10 } : seg
-          ),
-        };
-      }),
-      ...extras,
-    ];
-    const next: ScenarioCard[] = [];
-    for (const input of scenarios) {
-      const card = await engineCall<ScenarioCard>("flight_scenario", {
-        start_bit: est.bit,
-        bha: d.bha,
-        input,
-        plan: planEnd,
-        corridor: d.corridor,
-        constraints: d.constraints,
-        unit,
-      });
-      next.push(card);
-    }
-    setCards(next);
-
-    const envelopeInputs = [
-      { name: "BHA response low", yield: d.bha.slide_yield_low, color: "#8a6d1b" },
-      { name: "BHA response nominal", yield: d.bha.slide_yield_nom, color: "#c9a227" },
-      { name: "BHA response high", yield: d.bha.slide_yield_high, color: "#e0c36a" },
-    ];
-    const envelope: ExtraPath[] = [];
-    for (const e of envelopeInputs) {
-      const card = await engineCall<ScenarioCard>("flight_scenario", {
-        start_bit: est.bit,
-        bha: d.bha,
-        input: { ...extras[0], id: e.name, name: e.name, slide_yield: e.yield, segments: extras[0].segments.map((s) => ({ ...s, slide_yield_dls: e.yield })) },
-        plan: planEnd,
-        corridor: d.corridor,
-        constraints: d.constraints,
-        unit,
-      });
-      envelope.push(asPath(`${e.name} — BHA response envelope, not positional uncertainty`, e.color, "dot", card.path));
-    }
-
-    onPaths([
-      asPath("PLANNED rev 1", "#7ee0e0", "dash", d.plan.stations),
-      asPath("ESTIMATED bit interval", "#d08a4a", "dash", [sensor, ...est.path]),
-      ...next.map((c, i) => asPath(`SCENARIO ${c.input.name}`, SCENARIO_COLORS[i % SCENARIO_COLORS.length], "dash", c.path)),
-      ...envelope,
-    ]);
-    onDocuments([
-      { kind: "plan", payload: d.plan },
-      { kind: "bha", payload: d.bha },
-      { kind: "segment", payload: d.segments },
-      { kind: "decision", payload: { name: d.name, mark: d.mark, frozen: false } },
-    ]);
+  async function exportComparison() {
+    if (!chosen || !estimate) return;
+    const record = { format: "delvepath/flight-comparison/1", createdAt: new Date().toISOString(), version: __DELVE_VERSION__, source: __DELVE_SOURCE_SHA256__, holeName, unit, sensor, entered: values, estimate, selectedScenario: chosen.input.id, scenarios: cards, modelKey, assumptions: ["Hold last surveyed direction to estimate bit position.", "Zero rotary tendency; entered slide response.", "Plan offsets compare reconstructed plan at the same measured depth when covered."] };
+    await getPlatform().files.saveTextFile("flight-comparison.json", JSON.stringify(record, null, 2), "application/json").catch(e => setError(parseEngineError(e)));
   }
-
-  async function reveal() {
-    if (!demo || !estimate) return;
-    setErr("");
-    const frozen = cards.map((c) => ({
-      name: c.input.name,
-      pred: {
-        md: c.next_sensor_md,
-        inc_deg: c.next_sensor.inc_deg,
-        azi_deg: c.next_sensor.azi_deg,
-        north: c.next_sensor.north,
-        east: c.next_sensor.east,
-        tvd: c.next_sensor.tvd,
-      },
-    }));
-    const decision = {
-      id: "demo-decision",
-      hole_id: holeId || "demo-hole",
-      accepted_survey_md: demo.last_accepted.md,
-      estimated_bit_md: estimate.derived_bit_md,
-      plan_revision: 1,
-      bha_id: "demo-bha",
-      bha_revision: demo.bha.configuration_revision,
-      target_id: null,
-      offset_hole_id: null,
-      assumptions: ["SYNTHETIC / constructed"],
-      constraints: demo.constraints,
-      scenarios: demo.scenarios,
-      selected_scenario_id: "short",
-      memory_revision: demo.memory.qualified_count,
-      memory_sample_ids: demo.memory.sample_ids,
-      expected_survey_md: estimate.next_expected_sensor_md,
-      actual_resolution_md: demo.held_out.md,
-      scores: [],
-      created_at: "2026-08-28T12:00:00Z",
-      resolved_at: null,
-    };
-    const hold = cards.find((c) => c.input.id === "hold");
-    const actual = {
-      md: demo.held_out.md,
-      inc_deg: demo.held_out.inc_deg,
-      azi_deg: demo.held_out.azi_deg,
-      north: (hold?.future_bit.north ?? demo.last_accepted.north) + 12,
-      east: (hold?.future_bit.east ?? demo.last_accepted.east) - 8,
-      tvd: (hold?.future_bit.tvd ?? demo.last_accepted.tvd) + 1,
-    };
-    const sc = await engineCall<typeof scores>("flight_score", {
-      decision,
-      actual_md: demo.held_out.md,
-      actual,
-      frozen,
-    });
-    setScores(sc);
-    setRevealed(true);
-    setMemoryAfter(demo.memory.qualified_count + 1);
-    onDocuments([{ kind: "decision", payload: { ...decision, scores: sc, resolved_at: "2026-08-28T12:01:00Z" } }]);
-  }
-
-  function printShift() {
-    if (!demo || !estimate) return;
-    openReport(
-      shiftCardModel({
-        accepted: accepted
-          ? `MD ${fmt(accepted.md)} INC ${fmt(accepted.inc_deg)} AZI ${fmt(accepted.azi_deg)} accepted`
-          : "none",
-        estimatedBit: `MD ${fmt(estimate.derived_bit_md)} N ${fmt(estimate.bit.north)} E ${fmt(estimate.bit.east)} TVD ${fmt(estimate.bit.tvd)}`,
-        startBitMd: String(demo.segments[0]?.start_bit_md ?? ""),
-        endBitMd: String(demo.segments.slice(-1)[0]?.end_bit_md ?? ""),
-        drilled: String((demo.segments.slice(-1)[0]?.end_bit_md ?? 0) - (demo.segments[0]?.start_bit_md ?? 0)),
-        slide: footage ? fmt(footage.slide) : "—",
-        rotate: footage ? fmt(footage.rotate) : "—",
-        slidePct: footage ? fmt(footage.slide_pct) : "—",
-        hours: footage?.elapsed_hours == null ? "timestamps incomplete" : fmt(footage.elapsed_hours),
-        selected: cards.find((c) => c.input.id === "short")?.input.name ?? "—",
-        alternatives: cards.map((c) => c.input.name).join("; "),
-        offsets: cards.map((c) => `${c.input.name} UD ${c.ud ?? "—"} LR ${c.lr ?? "—"}`).join("; "),
-        bha: `${demo.bha.name} rev ${demo.bha.configuration_revision} sensor-to-bit ${demo.bha.sensor_to_bit} ${len}`,
-        memory: `qualified n=${demo.memory.qualified_count} median ${demo.memory.median_slide_yield ?? "n/a"}`,
-        scores: scores.map((s) => [s.name, fmt(s.miss_3d), fmt(s.inc_residual_deg), fmt(s.azi_residual_deg), fmt(s.md_difference)]),
-        warnings: latestAccepted === "accepted" ? [] : ["Flight Deck anchors require an explicitly accepted station."],
-        planRev: "1",
-        timestamp: "2026-08-28T12:00:00Z",
-      })
-    );
-  }
-
-  return (
-    <div className="workspace-panel">
-      <h2>Next-Stand Flight Deck + BHA Memory</h2>
-      <p className="muted">
-        Separate ACCEPTED SURVEY, ESTIMATED bit, and SCENARIO paths. {demo?.mark ?? "SYNTHETIC / constructed"} when the Curve
-        Recovery demo is loaded. Gravity TF 0/90/180/270 = build / right / drop / left. Sensor MD and bit MD are never conflated.
-      </p>
-      <div className="ws-row">
-        <button type="button" className="primary" onClick={() => void loadDemo()}>
-          Load Curve Recovery demo
-        </button>
-        <button type="button" disabled={!demo} onClick={() => void reveal()}>
-          Reveal held-out synthetic survey
-        </button>
-        <button type="button" disabled={!demo} onClick={printShift}>
-          Shift Card preview
-        </button>
-      </div>
-      {help && <p className="muted">{help}</p>}
-      {err && <div className="error">{err}</div>}
-      {estimate && accepted && (
-        <div className="ws-summary timed">
-          <p>
-            <b>0–15 s</b> ACCEPTED SURVEY sensor MD {fmt(accepted.md)} {len} · ESTIMATED bit MD {fmt(estimate.derived_bit_md)}{" "}
-            {len} · next expected sensor MD {fmt(estimate.next_expected_sensor_md)} {len}
-          </p>
-        </div>
-      )}
-      {demo && (
-        <div className="ws-row">
-          <label>
-            Short-correction slide {len}
-            <input
-              value={slideLen}
-              onChange={(e) => {
-                setSlideLen(e.target.value);
-                void evaluate(demo, Number(e.target.value), Number(tf));
-              }}
-            />
-          </label>
-          <label>
-            Toolface °
-            <input
-              value={tf}
-              onChange={(e) => {
-                setTf(e.target.value);
-                void evaluate(demo, Number(slideLen), Number(e.target.value));
-              }}
-            />
-          </label>
-          <span className="muted">40–60 s: edits update Plan / Profile / 3-D and cards immediately.</span>
-        </div>
-      )}
-      <div className="scenario-cards">
-        {cards.map((c) => (
-          <article key={c.input.id} className="scenario-card">
-            <h3>{c.input.name}</h3>
-            <p>Future bit MD {fmt(c.future_bit_md)} · next sensor MD {fmt(c.next_sensor_md)}</p>
-            <p>
-              Predicted survey INC/AZI {fmt(c.next_sensor.inc_deg)} / {fmt(c.next_sensor.azi_deg)}
-            </p>
-            <p>
-              UD {c.ud == null ? "—" : fmt(c.ud)} · LR {c.lr == null ? "—" : fmt(c.lr)} · max DLS {fmt(c.max_dls)} · avg DLS{" "}
-              {fmt(c.avg_dls)} · slide {fmt(c.slide_footage)} {len}
-            </p>
-            <p>
-              {c.constraint_feasible
-                ? "constraint-feasible under entered assumptions"
-                : `violations: ${c.violations.join("; ")}`}
-            </p>
-            <p className="muted">{c.assumptions.join(" ")}</p>
-          </article>
-        ))}
-      </div>
-      {demo && (
-        <details>
-          <summary>BHA Memory samples (never pooled across revisions)</summary>
-          <table className="plan-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Included</th>
-                <th>Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {demo.memory.samples.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.id}</td>
-                  <td>{s.included ? "included" : "excluded"}</td>
-                  <td>{s.reason}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-      )}
-      {revealed && (
-        <div className="ws-summary">
-          <p>
-            <b>60–90 s</b> Held-out MD {demo?.held_out.md}. Scores use the actual survey MD. Forecasts stayed frozen.
-            BHA Memory n → n+1: {demo?.memory.qualified_count} → {memoryAfter}.
-          </p>
-          <table className="plan-table">
-            <thead>
-              <tr>
-                <th>Forecast</th>
-                <th>3-D miss</th>
-                <th>ΔINC</th>
-                <th>ΔAZI</th>
-                <th>ΔMD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scores.map((s) => (
-                <tr key={s.name}>
-                  <td>{s.name}</td>
-                  <td>{fmt(s.miss_3d)}</td>
-                  <td>{fmt(s.inc_residual_deg)}</td>
-                  <td>{fmt(s.azi_residual_deg)}</td>
-                  <td>{fmt(s.md_difference)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+  return <div className="workspace-panel field-panel">
+    <span className="eyebrow">2 · LOOK AHEAD</span>
+    <h2>What happens over the next stand?</h2>
+    <p>Start at the last accepted survey in <b>{holeName}</b>. Estimate the bit, then compare three ways forward. Click a card to see its path beside you.</p>
+    <div className="ws-row"><button onClick={() => void loadDemo()} data-help="Loads a constructed survey and comparison plan into the whole project. It replaces the working example in Survey too.">Load Curve Recovery demo</button></div>
+    {!sensor ? <div className="field-callout">Accept a survey row to establish where the forecast starts. <button onClick={() => onNavigate("survey")}>Review surveys</button></div> : <p className="field-anchor">Accepted survey · MD {fmt(sensor.md)} {len} · inclination {fmt(sensor.inc_deg, 1)}° · direction {fmt(sensor.azi_deg, 1)}°</p>}
+    {ready && cards.length > 0 && <div className="forecast-switcher" role="group" aria-label="Quick forecast selection">{cards.map(c => <button key={c.input.id} aria-pressed={c.input.id === selected} onClick={() => setSelected(c.input.id)}>{c.input.name}</button>)}</div>}
+    <fieldset className="field-inputs"><legend>Enter the drilling assumptions</legend>
+      {([
+        ["lag", "Sensor to bit", len, "Distance along the hole from the survey tool to the bit. The amber interval holds the latest accepted inclination and azimuth; it is an estimate."],
+        ["stand", "Next interval", len, "How much more hole to model after the current bit. All three cards cover this same length."],
+        ["slide", "Slide length", len, "Length drilled with the motor held at the entered toolface, followed by rotating the rest of the interval."],
+        ["tf", "Toolface", "°", "Direction of the bend from the high side: 0 builds angle, 90 turns right, 180 drops angle, 270 turns left. Gravity toolface needs a nonvertical hole."],
+        ["yield", "Slide response", dlsLabel(unit), "Assumed bend rate while sliding. Enter a supported motor response; this is not a learned value or a measured survey."],
+        ["max", "Curvature limit", dlsLabel(unit), "Each forecast checks its largest bend rate across the entire interval, including the slide before the rotary section."],
+      ] as const).map(([id, label, suffix, help]) => <label key={id} data-help={help}>{label}<span><input aria-label={label} type="number" value={values[id]} onChange={e => { onUpdate([], null); setValues({ ...values, [id]: e.target.value }); }} /> {suffix}</span></label>)}
+    </fieldset>
+    <button className="primary" disabled={!sensor || busy} onClick={() => setRequested(true)} data-help="Calculates three forecasts with the shared Rust engine. Further edits update the cards and viewer automatically.">{busy ? "Calculating forecasts…" : requested && ready ? "Forecasts up to date" : "Compare next stand"}</button>
+    {error && <p role="alert" className="error">{error}</p>}
+    {ready && estimate && <p className="field-anchor">Bit estimate · MD {fmt(estimate.bit.md)} {len}. Amber joins the accepted survey to the bit; cyan is your selected forecast.</p>}
+    <div className="scenario-cards" role="group" aria-label="Forecast choices">
+      {ready && cards.map(c => <button key={c.input.id} className={"scenario-card " + (selected === c.input.id ? "selected" : "")} aria-pressed={selected === c.input.id} onClick={() => setSelected(c.input.id)} data-help={"Select " + c.input.name + ". The cyan path and next-survey marker change immediately. This choice is also available to uncertainty and clearance."}>
+        <span className="scenario-tag">{selected === c.input.id ? "● SHOWN IN VIEWER" : "VIEW THIS OPTION"}</span><h3>{c.input.name}</h3>
+        <p>{c.slide_footage === 0 ? "Continue on the current heading." : "Slide " + fmt(c.slide_footage, 1) + " " + len + ", then rotate " + fmt(c.input.added_md - c.slide_footage, 1) + " " + len + "."}</p>
+        <p>Next survey: {fmt(c.next_sensor.inc_deg, 1)}° inclination · {fmt(c.next_sensor.azi_deg, 1)}° direction</p>
+        <p>Largest bend: {fmt(c.max_dls, 1)} {dlsLabel(unit)}</p>
+        <strong>{c.constraint_feasible ? "Within entered curvature limit" : "Exceeds entered limit"}</strong>
+      </button>)}
     </div>
-  );
+    {chosen && <div className="field-callout" aria-live="polite"><b>Viewing: {chosen.input.name}</b>
+      <p>Bit after the stand: MD {fmt(chosen.future_bit.md)} {len}. Next survey tool position: MD {fmt(chosen.next_sensor.md)} {len}.</p>
+      {chosen.ud != null && chosen.lr != null ? <p>At the same measured depth as the plan: {fmt(Math.abs(chosen.ud))} {len} {chosen.ud >= 0 ? "above" : "below"}, {fmt(Math.abs(chosen.lr))} {len} to the {chosen.lr >= 0 ? "right" : "left"}.</p> : <p>No comparison plan covers this measured depth. You can still compare the forecast shapes.</p>}
+      <div className="ws-row"><button onClick={() => onNavigate("eou")}>3 · Add uncertainty</button><button onClick={() => onNavigate("collision")}>4 · Check nearby holes</button><button onClick={() => void exportComparison()}>Export this comparison</button></div>
+    </div>}
+    <details><summary>How this forecast is calculated</summary><p>The survey path uses Minimum Curvature. The bit estimate holds the last accepted direction across the sensor-to-bit gap. Sliding uses the entered gravity toolface and response; rotating holds direction. The next survey is sampled along the actual scenario at bit depth minus sensor spacing.</p><p>Comparison paths do not add measured survey rows. Motor response is entered, not automatically learned.</p>{chosen?.violations.map(v => <p key={v}>{v}</p>)}</details>
+  </div>;
 }

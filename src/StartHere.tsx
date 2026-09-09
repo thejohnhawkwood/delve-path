@@ -14,7 +14,7 @@ interface Props {
 const STEPS: { title: string; body: string; action?: "oregon" | "dual" | "target" | "plan" | "profile" | "3d" }[] = [
   {
     title: "What this is",
-    body: "DelvePath reconstructs a borehole from MD, INC, and AZI using Minimum Curvature. It is a prototype — not certified, not for steering or collision avoidance. Hover labels (when Tips is on) explain each term.",
+    body: "DelvePath reconstructs a borehole from MD, INC, and AZI using Minimum Curvature. Follow Survey → Look ahead → Uncertainty → Clearance to explore the same hole. Explain mode adds help when you hover or focus a control. This is a prototype for evaluating geometry, not for steering or collision avoidance.",
   },
   {
     title: "Files",
@@ -50,7 +50,7 @@ const STEPS: { title: string; body: string; action?: "oregon" | "dual" | "target
   },
   {
     title: "Plan & Flight Deck",
-    body: "Open Flight Deck and load Curve Recovery — Plan & Flight Deck (SYNTHETIC / constructed). You will see accepted sensor vs estimated bit, then compare hold and slide scenarios. Reveal the held-out survey to score frozen forecasts. Planning, Targets, Centerline, Depth, and Reports are separate workspaces. Centerline is screening only — not anti-collision.",
+    body: "Follow Survey → Look ahead → Uncertainty → Clearance. In Flight Deck, load Curve Recovery and click a forecast card: its cyan path appears beside the amber hold option. Enter a slide length and toolface to compare. Uncertainty can attach to the selected bit or forecast point. For a complete clearance example, load the crossing demo, use the active hole and generate a correction. Keep Explain mode on for hover and keyboard help.",
   },
 ];
 

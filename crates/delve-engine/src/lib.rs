@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod collision;
+pub mod survey_path;
 pub mod uncertainty;
 
 #[derive(Debug, Deserialize)]
@@ -35,8 +36,16 @@ pub fn engine_call_json(req: &str) -> Result<String, String> {
 
 fn dispatch(op: &str, p: Value) -> Result<String, String> {
     match op {
+        "sample_survey_path" => ser(survey_path::sample(
+            &de_field(&p, "input")?,
+            num(&p, "tolerance")?,
+        )),
         "collision_demo" => serde_json::to_string(&collision::demo()).map_err(|e| e.to_string()),
         "collision_analyze" => ser(collision::analyze(&de(&p)?)),
+        "screen_forecast" => ser(collision::screen_forecast(
+            &de_field(&p, "case")?,
+            &de_field::<Vec<collision::SurveyPoint>>(&p, "points")?,
+        )),
         "generate_drill_path" => ser(collision::generate(&de(&p)?)),
         "uncertainty_glyphs" => {
             let requests: Vec<uncertainty::GlyphRequest> = de(&p)?;

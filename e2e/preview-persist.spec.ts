@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("Oregon calculates, dual-lateral overlays, and IndexedDB survives refresh", async ({ page }) => {
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page.getByRole("button", { name: "Oregon example" }).click();
   await expect(page.getByText("Calculated (Minimum Curvature).").first()).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".kv b").first()).toHaveText("2,591.00");

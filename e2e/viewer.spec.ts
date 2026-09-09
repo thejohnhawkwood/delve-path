@@ -29,7 +29,7 @@ async function expectBoundedScene(page: Page) {
 
 test("planar drill paths keep a visible true-scale 3-D scene", async ({ page }, info) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page.getByRole("button", { name: "Load dual-lateral example", exact: true }).click();
   await view(page, "3-D").click();
   await expectBoundedScene(page);
@@ -41,10 +41,11 @@ test("EOU imports at the selected station and survives workspace and view change
   await page.setViewportSize({ width: 1366, height: 768 });
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page.getByRole("button", { name: "Load dual-lateral example", exact: true }).click();
   await workspace(page, "EOU").click();
   await expect(page.getByText("Selected station: MD 0.00 ft.")).toBeVisible();
+  await page.getByText("Advanced: correlated errors / covariance matrix", { exact: true }).click();
   await page.getByLabel("C_NE", { exact: true }).fill("1");
   await page.getByRole("button", { name: "Import 1σ matrix", exact: true }).click();
   await expect(page.getByText(/Imported 1σ NEV covariance at MD 0.00/)).toBeVisible();
@@ -80,13 +81,13 @@ test("repeated hide, remount, target and 3-D transitions resize without stale ca
   await page.setViewportSize({ width: 1366, height: 768 });
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page.getByRole("button", { name: "Load dual-lateral example", exact: true }).click();
   for (let i = 0; i < 5; i++) {
     await view(page, "3-D").click();
     await expectBoundedScene(page);
     await workspace(page, "Anti-collision").click();
-    await expect(page.locator(".legacy-workspace .chart")).toHaveCount(0);
+    await expect(page.locator(".legacy-workspace .chart")).toHaveCount(1);
     await workspace(page, "Survey").click();
     await expectBoundedScene(page);
     await view(page, "Target").click();

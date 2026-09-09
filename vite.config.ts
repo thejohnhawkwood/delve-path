@@ -41,6 +41,7 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: { ignored: ["**/target/**", "**/artifacts/**"] },
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {

@@ -1,0 +1,98 @@
+import { test, expect, type Page } from "@playwright/test";
+const tab = (p: Page, name: string) => p.getByRole("navigation", { name: "Workspaces" }).getByRole("button", { name, exact: true });
+const plot = (p: Page) => p.locator(".viz .chart");
+const forecast = (p: Page, name: string) => p.getByRole("group", { name: "Forecast choices" }).getByRole("button", { name: new RegExp(name) });
+
+test("a field lead can select a forecast, see it, explain a control and carry it into uncertainty", async ({ page }, info) => {
+  const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
+  await page.goto("./#workspace");
+  await tab(page,"Flight Deck").click();
+  await page.getByRole("button", { name: "Load Curve Recovery demo" }).click();
+  await expect(forecast(page,"Your slide then rotate")).toHaveAttribute("aria-pressed","true");
+  const selectedTrace = () => plot(page).evaluate((n: any) => n.data.find((t: any) => t.name === "SCENARIO · Your slide then rotate")?.x);
+  await expect.poll(selectedTrace).toBeTruthy();
+  const before = await selectedTrace();
+  await forecast(page,"Hold direction").click();
+  await expect(page.locator(".viewer-caption")).toContainText("Hold direction");
+  await expect.poll(() => plot(page).evaluate((n: any) => n.data.some((t: any) => t.name === "SCENARIO · Your slide then rotate"))).toBe(false);
+  await forecast(page,"Your slide then rotate").click();
+  await page.getByLabel("Slide length", { exact: true }).fill("40");
+  await expect.poll(selectedTrace).toBeTruthy();
+  await expect.poll(selectedTrace).not.toEqual(before);
+  await page.getByLabel("Toolface", { exact: true }).hover();
+  await expect(page.getByRole("tooltip").filter({ hasText: "270 turns left" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.locator(".workspace-host").evaluate(el => el.scrollTop = 0);
+  await page.mouse.move(0,0);
+  await page.screenshot({ path: info.outputPath("flight-deck.png") });
+  await tab(page,"EOU").click();
+  await page.getByLabel("Uncertainty location").selectOption("bit");
+  await page.getByLabel("Apply this envelope to the whole hole").check();
+  await page.getByRole("button", { name: "Import 1σ matrix", exact: true }).click();
+  await expect(page.getByText(/Imported 1σ NEV covariance at MD 2,452.00/)).toBeVisible();
+  await expect.poll(() => plot(page).evaluate((n: any) => n.data.some((t: any) => t.type === "mesh3d"))).toBe(true);
+  await tab(page,"Flight Deck").click();
+  await expect(forecast(page,"Your slide then rotate")).toHaveAttribute("aria-pressed","true");
+  await expect(page.getByLabel("Slide length", { exact: true })).toHaveValue("40");
+  await expect.poll(selectedTrace).toBeTruthy();
+  await page.reload();
+  await expect(page.locator(".workflow-strip")).toContainText("Curve Recovery");
+  await tab(page,"EOU").click();
+  await expect(page.getByLabel("Apply this envelope to the whole hole")).toBeChecked();
+  expect(errors).toEqual([]);
+});
+
+test("crossing holes share Survey, clearance and the comparison plan", async ({ page }, info) => {
+  const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
+  await page.goto("./#workspace");
+  await tab(page,"Anti-collision").click();
+  await page.getByRole("button", { name: "Load crossing demo" }).click();
+  await expect(page.locator(".workflow-strip")).toContainText("DP-03");
+  await page.getByRole("button", { name: "Use active hole & forecast" }).click();
+  await expect(page.getByRole("button",{name:"Generate drill path",exact:true})).toBeEnabled();
+  await page.getByRole("button",{name:"Generate drill path",exact:true}).click();
+  await expect(page.getByLabel("Correction candidate")).toBeVisible();
+  await expect.poll(() => plot(page).evaluate((n:any) => n.data.some((t:any) => t.name.startsWith("CORRECTION")))).toBe(true);
+  const candidate = await page.getByLabel("Correction candidate").inputValue();
+  await tab(page,"Survey").click();
+  await expect(page.locator("table.survey")).toContainText("DP-01");
+  await expect(page.locator("table.survey")).toContainText("DP-02");
+  await tab(page,"Anti-collision").click();
+  await expect(page.getByLabel("Correction candidate")).toHaveValue(candidate);
+  await page.locator(".workspace-host").evaluate(el => el.scrollTop = 0);
+  await page.mouse.move(0,0);
+  await page.screenshot({ path: info.outputPath("clearance-linked.png") });
+  await page.getByRole("button",{name:"Use correction as comparison plan"}).click();
+  await expect(page.locator(".workspace-nav button.on")).toHaveText("Flight Deck");
+  await expect.poll(() => plot(page).evaluate((n:any) => n.data.some((t:any) => t.name === "PLANNED · Clearance correction"))).toBe(true);
+  await page.getByRole("button",{name:"Compare next stand",exact:true}).click();
+  await expect(forecast(page,"Your slide then rotate")).toBeVisible();
+  await tab(page,"Anti-collision").click();
+  await expect(page.getByText(/This result is out of date/)).toBeVisible();
+  await expect(page.getByRole("button",{name:"Generate drill path",exact:true})).toBeDisabled();
+  await page.getByRole("button",{name:"Use active hole & forecast"}).click();
+  await expect(page.getByText(/Sampled path clearance:/)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("missing review or uncertainty produces an actionable next step", async ({ page }) => {
+  await page.goto("./#workspace");
+  await tab(page,"Flight Deck").click();
+  await expect(page.getByRole("button",{name:"Compare next stand",exact:true})).toBeDisabled();
+  await expect(page.getByRole("button",{name:"Review surveys"})).toBeVisible();
+  await tab(page,"Anti-collision").click();
+  await page.getByRole("button",{name:"Use active hole & forecast"}).click();
+  await expect(page.getByRole("alert")).toContainText("Accept a survey");
+});
+
+test("a vertical accepted survey still offers hold when gravity toolface cannot be used", async ({ page }) => {
+  await page.goto("./#workspace");
+  await page.getByRole("button", { name: "Load dual-lateral example" }).click();
+  const reviews = page.locator("select.review-state");
+  await reviews.nth(0).selectOption("accepted");
+  await tab(page,"Flight Deck").click();
+  await page.getByRole("button", { name: "Compare next stand", exact: true }).click();
+  await expect(forecast(page,"Hold direction")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("alert")).toContainText(/gravity|singular|vertical/i);
+  await expect(page.locator(".viewer-caption")).toContainText("Hold direction");
+});

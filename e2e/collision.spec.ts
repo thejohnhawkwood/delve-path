@@ -8,10 +8,13 @@ test("crossing case generates a correction, layers work in every view, audit rep
   page.on("pageerror", (e) => errors.push(e.message));
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page
     .getByRole("button", { name: "Anti-collision", exact: true })
     .click();
+  await page.getByRole("button", { name: "Load crossing demo" }).click();
+  await expect(page.locator(".workflow-strip")).toContainText("DP-03");
+  await page.getByRole("button", { name: "Use active hole & forecast" }).click();
   await expect(
     page.getByRole("button", { name: "Generate drill path", exact: true }),
   ).toBeEnabled({ timeout: 30000 });
@@ -35,7 +38,7 @@ test("crossing case generates a correction, layers work in every view, audit rep
   await expect
     .poll(() =>
       page
-        .locator(".collision-preview .chart")
+        .locator(".viz .chart")
         .evaluate(
           (e) =>
             (e as unknown as { data?: { type: string }[] }).data?.filter(
@@ -49,7 +52,7 @@ test("crossing case generates a correction, layers work in every view, audit rep
   await expect
     .poll(() =>
       page
-        .locator(".collision-preview .chart")
+        .locator(".viz .chart")
         .evaluate(
           (e) =>
             (e as unknown as { data?: { type: string }[] }).data?.filter(
@@ -71,7 +74,7 @@ test("crossing case generates a correction, layers work in every view, audit rep
     await expect
       .poll(() =>
         page
-          .locator(".collision-preview .chart")
+          .locator(".viz .chart")
           .evaluate(
             (e) =>
               (
@@ -116,7 +119,7 @@ test("crossing case generates a correction, layers work in every view, audit rep
   await expect
     .poll(() =>
       page
-        .locator(".collision-preview .chart")
+        .locator(".viz .chart")
         .evaluate(
           (e) =>
             (e as unknown as { data?: { type: string }[] }).data?.filter(
@@ -129,7 +132,7 @@ test("crossing case generates a correction, layers work in every view, audit rep
   expect(
     requests.filter(
       (u) =>
-        !u.startsWith("http://127.0.0.1:4173") &&
+        !u.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173") &&
         !u.startsWith("data:") &&
         !u.startsWith("blob:"),
     ),
@@ -144,10 +147,13 @@ test("edits invalidate the correction and tight dogleg constraints return no pat
   page,
   context,
 }) => {
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page
     .getByRole("button", { name: "Anti-collision", exact: true })
     .click();
+  await page.getByRole("button", { name: "Load crossing demo" }).click();
+  await expect(page.locator(".workflow-strip")).toContainText("DP-03");
+  await page.getByRole("button", { name: "Use active hole & forecast" }).click();
   const generate = page.getByRole("button", {
     name: "Generate drill path",
     exact: true,
@@ -172,10 +178,13 @@ test("edits invalidate the correction and tight dogleg constraints return no pat
 test("saved collision runs reopen from the browser project and replay", async ({
   page,
 }) => {
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page
     .getByRole("button", { name: "Anti-collision", exact: true })
     .click();
+  await page.getByRole("button", { name: "Load crossing demo" }).click();
+  await expect(page.locator(".workflow-strip")).toContainText("DP-03");
+  await page.getByRole("button", { name: "Use active hole & forecast" }).click();
   const generate = page.getByRole("button", {
     name: "Generate drill path",
     exact: true,

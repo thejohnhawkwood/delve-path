@@ -346,6 +346,18 @@ pub fn evaluate_scenario(
     target_boundary: Option<f64>,
     min_centerline: Option<f64>,
 ) -> Result<ScenarioCard, PlanError> {
+    if !input.added_md.is_finite() || input.added_md <= 0.0 {
+        return Err(PlanError::msg(
+            "Scenario length must be finite and positive.",
+        ));
+    }
+    if !input.segments.is_empty()
+        && (input.segments.iter().map(|s| s.length).sum::<f64>() - input.added_md).abs() > 1e-6
+    {
+        return Err(PlanError::msg(
+            "Slide and rotate lengths must add up to the next interval.",
+        ));
+    }
     let class = StationClass::Projected;
     let proj = match input.method.as_str() {
         "hold" => project_hold(&HoldRequest {
@@ -373,7 +385,7 @@ pub fn evaluate_scenario(
             unit,
             class,
         })?,
-        _ => project_slide_rotate(&SlideRotateRequest {
+        "slide_rotate" => project_slide_rotate(&SlideRotateRequest {
             start: start_bit,
             segments: if input.segments.is_empty() {
                 vec![SlideRotateSeg {
@@ -392,6 +404,7 @@ pub fn evaluate_scenario(
             singular_inc_deg: DEFAULT_GTF_SINGULAR_DEG,
             class,
         })?,
+        _ => return Err(PlanError::msg("Unknown Flight Deck projection method.")),
     };
     let future = proj
         .points
@@ -399,7 +412,12 @@ pub fn evaluate_scenario(
         .cloned()
         .ok_or_else(|| PlanError::msg("empty scenario"))?;
     let next_md = future.md - bha.sensor_to_bit;
-    let next_sensor = if next_md <= start_bit.md {
+    if !bha.sensor_to_bit.is_finite() || bha.sensor_to_bit < 0.0 || next_md < start_bit.md - 1e-9 {
+        return Err(PlanError::msg(
+            "Next interval must cover the sensor-to-bit distance; earlier path is not supplied.",
+        ));
+    }
+    let next_sensor = if (next_md - start_bit.md).abs() <= 1e-9 {
         ProjectionPoint {
             md: next_md,
             inc_deg: start_bit.inc_deg,
@@ -410,29 +428,43 @@ pub fn evaluate_scenario(
             dogleg_deg: 0.0,
             dls_display: 0.0,
             class,
-            comment: "next expected sensor (behind current bit)".into(),
+            comment: "next sensor at current bit".into(),
         }
+    } else if bha.sensor_to_bit == 0.0 {
+        future.clone()
     } else {
-        // Approximate: same path, earlier MD by interpolating linearly in MD along the last interval.
-        let frac = (next_md - start_bit.md) / (future.md - start_bit.md).max(1e-9);
-        ProjectionPoint {
-            md: next_md,
-            inc_deg: start_bit.inc_deg + frac * (future.inc_deg - start_bit.inc_deg),
-            azi_deg: start_bit.azi_deg
-                + frac
-                    * azimuth_delta_rad(
-                        start_bit.azi_deg.to_radians(),
-                        future.azi_deg.to_radians(),
-                    )
-                    .to_degrees(),
-            north: start_bit.north + frac * (future.north - start_bit.north),
-            east: start_bit.east + frac * (future.east - start_bit.east),
-            tvd: start_bit.tvd + frac * (future.tvd - start_bit.tvd),
-            dogleg_deg: future.dogleg_deg * frac,
-            dls_display: future.dls_display,
-            class,
-            comment: "next expected sensor".into(),
-        }
+        // Replay the same projection model to sensor MD. Truncate ordered segments,
+        // rather than drawing a chord across the complete slide/rotate interval.
+        let mut prefix = input.clone();
+        prefix.added_md = next_md - start_bit.md;
+        let mut remaining = prefix.added_md;
+        prefix.segments = input
+            .segments
+            .iter()
+            .filter_map(|s| {
+                if remaining <= 1e-9 {
+                    return None;
+                }
+                let mut segment = s.clone();
+                segment.length = remaining.min(s.length);
+                remaining -= segment.length;
+                Some(segment)
+            })
+            .collect();
+        let mut no_lag = bha.clone();
+        no_lag.sensor_to_bit = 0.0;
+        evaluate_scenario(
+            start_bit,
+            &no_lag,
+            &prefix,
+            None,
+            None,
+            constraints,
+            unit,
+            None,
+            None,
+        )?
+        .future_bit
     };
     let (ud, lr) = if let Some(p) = plan_att {
         match plan_offsets(p, future.north, future.east, future.tvd) {
@@ -494,10 +526,10 @@ pub fn evaluate_scenario(
             slide_footage, constraints.min_useful_slide
         ));
     }
-    if future.dls_display > constraints.max_dls + 1e-6 {
+    if max_dls > constraints.max_dls + 1e-6 {
         violations.push(format!(
             "Max DLS {:.3} exceeds allowed {:.3}.",
-            future.dls_display, constraints.max_dls
+            max_dls, constraints.max_dls
         ));
     }
     if let Some(y) = input.slide_yield {
@@ -540,10 +572,18 @@ pub fn evaluate_scenario(
         lr,
         target_boundary_distance: target_boundary,
         max_dls,
-        avg_dls: if proj.points.is_empty() {
-            max_dls
-        } else {
-            proj.points.iter().map(|p| p.dls_display).sum::<f64>() / proj.points.len() as f64
+        avg_dls: {
+            let mut previous_md = start_bit.md;
+            let total_bend: f64 = proj
+                .points
+                .iter()
+                .map(|p| {
+                    let course = p.md - previous_md;
+                    previous_md = p.md;
+                    p.dls_display * course
+                })
+                .sum();
+            total_bend / input.added_md
         },
         slide_footage,
         min_centerline,
@@ -757,6 +797,94 @@ fn chrono_hours(iso: &str) -> Result<f64, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sensor_follows_slide_before_rotation_and_limit_checks_the_whole_path() {
+        let mut b = bha();
+        b.sensor_to_bit = 70.0;
+        let start = sensor();
+        let input = ScenarioInput {
+            id: "slide-rotate".into(),
+            name: "slide-rotate".into(),
+            method: "slide_rotate".into(),
+            added_md: 100.0,
+            dls_display: None,
+            toolface_deg: None,
+            build_deg_per_ref: None,
+            turn_deg_per_ref: None,
+            slide_yield: Some(10.0),
+            segments: vec![
+                SlideRotateSeg {
+                    mode: SlideMode::Slide,
+                    length: 40.0,
+                    toolface_deg: 90.0,
+                    slide_yield_dls: 10.0,
+                    rotary_dls: 0.0,
+                    rotary_tf_deg: 0.0,
+                    dls_ref: DlsRefLength::Per100Ft,
+                },
+                SlideRotateSeg {
+                    mode: SlideMode::Rotate,
+                    length: 60.0,
+                    toolface_deg: 0.0,
+                    slide_yield_dls: 0.0,
+                    rotary_dls: 0.0,
+                    rotary_tf_deg: 0.0,
+                    dls_ref: DlsRefLength::Per100Ft,
+                },
+            ],
+        };
+        let limits = OperatingConstraints {
+            stand_length: 100.0,
+            max_slide_per_stand: 100.0,
+            min_useful_slide: 0.0,
+            max_dls: 6.0,
+            max_yield: 12.0,
+        };
+        let card = evaluate_scenario(
+            start,
+            &b,
+            &input,
+            None,
+            None,
+            &limits,
+            UnitSystem::Imperial,
+            None,
+            None,
+        )
+        .unwrap();
+        let expected = project_gravity_tf(&GravityTfRequest {
+            start,
+            added_md: 30.0,
+            dls_display: 10.0,
+            dls_ref: DlsRefLength::Per100Ft,
+            toolface_deg: 90.0,
+            unit: UnitSystem::Imperial,
+            singular_inc_deg: DEFAULT_GTF_SINGULAR_DEG,
+            class: StationClass::Projected,
+        })
+        .unwrap();
+        let p = expected.points.last().unwrap();
+        assert!((card.next_sensor.north - p.north).abs() < 1e-8);
+        assert!((card.next_sensor.east - p.east).abs() < 1e-8);
+        assert!((card.next_sensor.azi_deg - p.azi_deg).abs() < 1e-8);
+        assert_eq!(card.next_sensor_md, start.md + 30.0);
+        assert!(card.violations.iter().any(|v| v.starts_with("Max DLS")));
+        assert!((card.avg_dls - 4.0).abs() < 0.01);
+        b.sensor_to_bit = 101.0;
+        assert!(evaluate_scenario(
+            start,
+            &b,
+            &input,
+            None,
+            None,
+            &limits,
+            UnitSystem::Imperial,
+            None,
+            None
+        )
+        .is_err());
+    }
 
     fn bha() -> BhaRun {
         BhaRun {

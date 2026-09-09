@@ -5,6 +5,7 @@ import {
   deleteTarget,
   lastMeasured,
   listHoles,
+  loadDocuments,
   loadStations,
   loadTargets,
   newUuid,
@@ -25,11 +26,15 @@ import {
 } from "./api";
 import { type ExtraPath, type HoleOverlay, type TargetOutlineTrace } from "./Charts";
 import { boundsFor3d } from "./chartBounds";
+import { engineCall } from "./engine";
+import { envelopeFrom, pathBounds, type FlightSelection, type SharedUncertainty } from "./fieldModel";
+import type { CollisionCase } from "./collision/types";
+import { ExplainMode } from "./ExplainMode";
 import { getPlatform } from "./platform";
 import { comparableDemoFrame, defaultHoleFrame, defaultStationReview } from "./records";
 import { convertHoleLengths } from "./unitsConvert";
 import { PlanningWorkspace } from "./workspaces/PlanningWorkspace";
-import { FlightDeckWorkspace } from "./workspaces/FlightDeckWorkspace";
+import { FlightDeckWorkspace, type RecoveryDemo } from "./workspaces/FlightDeckWorkspace";
 import { TargetsWorkspace, type TargetOutline } from "./workspaces/TargetsWorkspace";
 import { CenterlineWorkspace } from "./workspaces/CenterlineWorkspace";
 import { DepthWorkspace } from "./workspaces/DepthWorkspace";
@@ -135,11 +140,36 @@ export default function App() {
   const [tie, setTie] = useState<TieIn>({ tvd: 0, north: 0, east: 0 });
   const [rows, setRows] = useState<MeasuredStation[]>([emptyRow(0)]);
   const [traj, setTraj] = useState<Trajectory | null>(null);
+  const [calculatedKey, setCalculatedKey] = useState("");
+  const calculationRevision = useRef(0);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [selected, setSelected] = useState(0);
   const [tab, setTab] = useState<ChartTab>("planView");
   const [workspace, setWorkspace] = useState<Workspace>("survey");
   const [extraPaths, setExtraPaths] = useState<ExtraPath[]>([]);
+  const [flightPaths, setFlightPaths] = useState<ExtraPath[]>([]);
+  const [flightSelection, setFlightSelection] = useState<FlightSelection | null>(null);
+  const [collisionPaths, setCollisionPaths] = useState<ExtraPath[]>([]);
+  const [collisionLabel, setCollisionLabel] = useState("");
+  const receiveCollision = useCallback((paths: ExtraPath[], label = "") => { setCollisionPaths(paths); setCollisionLabel(label); }, []);
+  const [collisionInput, setCollisionInput] = useState<CollisionCase | null>(null);
+  const [caseTemplate, setCaseTemplate] = useState<CollisionCase | null>(null);
+  const [caseModelKey, setCaseModelKey] = useState("");
+  const [uncertainties, setUncertainties] = useState<Record<string, SharedUncertainty>>({});
+  const [uncertaintyAt, setUncertaintyAt] = useState("selected");
+  const [focusAhead, setFocusAhead] = useState(true);
+  const receiveFlight = useCallback((paths: ExtraPath[], choice: FlightSelection | null) => {
+    setFlightPaths(paths); setFlightSelection(choice);
+  }, []);
+  const receiveUncertainty = useCallback((value: SharedUncertainty | null, id: string) => {
+    setUncertainties(prev => {
+      const next = { ...prev };
+      if (value) next[id] = value; else delete next[id];
+      return next;
+    });
+    if (project && id) void saveDocument({ id: id + ":field-envelope", hole_id: id, kind: "covariance", payload: JSON.stringify(value), updated_at: new Date().toISOString() })
+      .catch(e => setStatus("Could not save uncertainty: " + String(e)));
+  }, [project]);
   const [focusEou, setFocusEou] = useState(true);
   const receiveEouPaths = useCallback((paths: ExtraPath[]) => {
     setExtraPaths((prev) => [...prev.filter((p) => !p.name.startsWith("EOU")), ...paths]);
@@ -196,7 +226,9 @@ export default function App() {
   }, [unit, aziRef, vsp, tie, rows]);
 
   const recalc = useCallback(async () => {
+    const revision = ++calculationRevision.current;
     const r = req();
+    setCalculatedKey("");
     if (r.stations.length === 0) {
       setTraj(null);
       setIssues([]);
@@ -208,7 +240,9 @@ export default function App() {
       else if (projKind === "tvd") next = await projectTangentTvd(r, projVal);
       else if (projKind === "bit") next = await projectTangentBit(r, projVal);
       else next = await calculate(r);
+      if (revision !== calculationRevision.current) return;
       setTraj(next);
+      setCalculatedKey(JSON.stringify(r));
       setIssues(next.stations.some((s) => s.class === "projected")
         ? [
             {
@@ -221,6 +255,7 @@ export default function App() {
         : []);
       setStatus("Calculated (Minimum Curvature).");
     } catch (e) {
+      if (revision !== calculationRevision.current) return;
       setIssues([
         {
           severity: "error",
@@ -232,6 +267,27 @@ export default function App() {
       setStatus(String(e));
     }
   }, [req, projKind, projVal]);
+
+  useEffect(() => {
+    if (hole && project?.id === hole.project_id) {
+      try { localStorage.setItem("delvepath:active-hole:" + project.id, hole.id); } catch { /* storage may be disabled */ }
+    }
+  }, [hole?.id, project?.id]);
+
+  function preferredHole(list: HoleRecord[]) {
+    try { return list.find(h => h.id === localStorage.getItem("delvepath:active-hole:" + h.project_id)) ?? list[0]; }
+    catch { return list[0]; }
+  }
+
+  async function restoreEnvelopes(list: HoleRecord[]) {
+    const entries = await Promise.all(list.map(async h => {
+      const docs = await loadDocuments(h.id, "covariance");
+      const doc = docs.find(d => d.id === h.id + ":field-envelope");
+      const value: SharedUncertainty | null = doc ? JSON.parse(doc.payload) : null;
+      return value?.holeId === h.id ? [h.id, value] as const : null;
+    }));
+    setUncertainties(Object.fromEntries(entries.filter((e): e is readonly [string, SharedUncertainty] => e !== null)));
+  }
 
   useEffect(() => {
     void recalc();
@@ -250,6 +306,7 @@ export default function App() {
   }
 
   function applyDraft(d: HoleDraft) {
+    setExtraPaths([]); setFlightPaths([]); setFlightSelection(null); setPlanStations([]);
     setUnit(d.unit);
     setAziRef(d.aziRef);
     setVsp(d.vsp);
@@ -323,6 +380,24 @@ export default function App() {
     }, 2000);
   }, [persist]);
 
+  async function saveWorkingProject() {
+    try {
+      if (project) { await persist(); return; }
+      snapshotDraft();
+      const path = runtime === "tauri" ? await pickSavePath() : undefined;
+      if (runtime === "tauri" && !path) return;
+      const p = await getPlatform().repo.create({ path: path ?? undefined, name: caseTemplate?.name ?? hole?.name ?? "Field project", client: "" });
+      const list = (holeList.length ? holeList : [makeHoleRec(crypto.randomUUID(), p.id, "Hole 1")]).map(h => ({ ...h, project_id: p.id }));
+      for (const h of list) {
+        const d = drafts.current[h.id] ?? { rows, tie, unit, aziRef, vsp, targets };
+        await persistHoleDraft({ ...h, unit_system: d.unit, azimuth_reference: d.aziRef, vsp_deg: d.vsp }, d);
+        if (uncertainties[h.id]) await saveDocument({ id: h.id + ":field-envelope", hole_id: h.id, kind: "covariance", payload: JSON.stringify(uncertainties[h.id]), updated_at: new Date().toISOString() });
+      }
+      setProject(p); setHoles(list); setHole(list.find(h => h.id === hole?.id) ?? list[0]); dirty.current = false;
+      setStatus("Saved all working holes, targets and uncertainty declarations.");
+    } catch (e) { setStatus("Save failed: " + String(e)); }
+  }
+
   useEffect(() => {
     const onBlur = () => {
       if (dirty.current) void persist();
@@ -384,13 +459,15 @@ export default function App() {
     setProject(p);
     setHoles(listed);
     drafts.current = {};
-    if (listed[0]) {
-      await applyStoredHole(listed[0]);
+    await restoreEnvelopes(listed);
+    if (preferredHole(listed)) {
+      await applyStoredHole(preferredHole(listed));
     }
     setStatus(`Opened ${path}`);
   }
 
   async function applyStoredHole(h: HoleRecord) {
+    setExtraPaths([]); setFlightPaths([]); setFlightSelection(null); setPlanStations([]); setCollisionInput(null);
     setHole(h);
     setUnit(h.unit_system === "metric" ? "metric" : "imperial");
     setAziRef((h.azimuth_reference as AzimuthReference) || "unknown");
@@ -620,7 +697,8 @@ export default function App() {
           const listed = await platform.repo.listHoles(p.id);
           setProject(p);
           setHoles(listed);
-          if (listed[0]) await applyStoredHole(listed[0]);
+          await restoreEnvelopes(listed);
+          if (preferredHole(listed)) await applyStoredHole(preferredHole(listed));
           setStatus("Reopened local browser project. Data stays on this device. Not certified.");
           return;
         } catch {
@@ -646,7 +724,8 @@ export default function App() {
     setProject(p);
     setHoles(listed);
     drafts.current = {};
-    if (listed[0]) await applyStoredHole(listed[0]);
+    await restoreEnvelopes(listed);
+    if (preferredHole(listed)) await applyStoredHole(preferredHole(listed));
     else {
       setHole(null);
       setRows([emptyRow(0)]);
@@ -992,6 +1071,126 @@ export default function App() {
 
   const posProjected = pos?.class === "projected";
 
+  const modelKey = JSON.stringify([hole?.id, unit, aziRef, tie, rows, hole?.origin_id, hole?.origin_north, hole?.origin_east, hole?.vertical_datum, hole?.vertical_datum_name, hole?.crs_epsg]);
+  const acceptedSensor = useMemo(() => {
+    if (calculatedKey !== JSON.stringify(req()) || issues.some(i => i.severity === "error") || traj?.unit_system !== unit) return null;
+    const row = [...rows].reverse().find(r => r.review_state === "accepted");
+    return row ? calcStations.find(s => s.md === row.md && s.inc_deg === row.inc_deg && s.azi_deg === row.azi_deg) ?? null : null;
+  }, [rows, calcStations, issues, traj?.unit_system, unit, calculatedKey, req]);
+  const uncertaintyStation = uncertaintyAt === "bit" ? flightSelection?.bit ?? null
+    : uncertaintyAt === "future" ? flightSelection?.path.slice(-1)[0] ?? null
+    : uncertaintyAt === "latest" ? acceptedSensor : calcStations[selected] ?? null;
+  const collisionContextKey = modelKey + JSON.stringify([flightSelection, uncertainties, planStations]);
+  const collisionStale = !!collisionInput && caseModelKey !== collisionContextKey;
+  const showingCollision = !collisionStale && workspace === "collision" && collisionPaths.length > 0;
+  const viewerPaths = useMemo(() => showingCollision ? collisionPaths : [...extraPaths, ...flightPaths], [extraPaths, flightPaths, collisionPaths, showingCollision]);
+  const aheadBounds = useMemo(() => {
+    const paths = workspace === "collision" && !collisionStale ? collisionPaths.filter(p => !p.mesh && p.layer !== "Current path")
+      : flightPaths.length ? flightPaths : extraPaths.filter(p => p.name.startsWith("PLANNED"));
+    return paths.some(p => p.points.length) ? pathBounds(paths) : undefined;
+  }, [workspace, collisionStale, collisionPaths, flightPaths, extraPaths]);
+
+  async function adoptCrossingCase(input: CollisionCase) {
+    snapshotDraft();
+    if (dirty.current && project) await persist();
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    dirty.current = false;
+    // Work on an unsaved example; never overwrite the previously opened project.
+    const sampleProject = runtime === "browser" ? await getPlatform().repo.create({ name: input.name, client: "Synthetic example" }) : null;
+    setProject(sampleProject);
+    const makeHole = (id: string, name: string): HoleRecord => ({
+      id, name, project_id: sampleProject?.id ?? "", ...defaultHoleFrame(), ...input.frame,
+      survey_convention: "oilfield_from_vertical", azimuth_reference: input.frame.north_reference,
+      vsp_deg: 0, declination_note: "", grid_note: "", parent_hole_id: null, branch_md: null, color: null,
+    });
+    const prefix = crypto.randomUUID();
+    const mainHole = makeHole(prefix + "-current", "DP-03 · Active lateral");
+    const all = [mainHole, ...input.offsets.map(o => makeHole(prefix + "-" + o.id, o.name))];
+    const points = [input.current, ...input.offsets.map(o => o.points)];
+    const envelopes = [input.envelope, ...input.offsets.map(o => o.envelope)];
+    const newUncertainty: Record<string, SharedUncertainty> = {};
+    for (let i = 0; i < all.length; i++) {
+      drafts.current[all[i].id] = {
+        unit: input.frame.unit_system, aziRef: input.frame.north_reference as AzimuthReference, vsp: 0,
+        tie: points[i][0], targets: [],
+        rows: points[i].map(p => ({ ...emptyRow(p.md), inc_deg: p.inc_deg, azi_deg: p.azi_deg, review_state: "accepted", review_source: "synthetic", comment: "Constructed crossing example" })),
+      };
+      newUncertainty[all[i].id] = { holeId: all[i].id, unit: input.frame.unit_system, station: points[i].slice(-1)[0]!, covariance: envelopes[i].covariance, source: envelopes[i].source, wholePath: true };
+      if (sampleProject) {
+        await persistHoleDraft(all[i], drafts.current[all[i].id]);
+        await saveDocument({ id: all[i].id + ":field-envelope", hole_id: all[i].id, kind: "covariance", payload: JSON.stringify(newUncertainty[all[i].id]), updated_at: new Date().toISOString() });
+      }
+    }
+    setHoles(all); setHole(mainHole); applyDraft(drafts.current[mainHole.id]); setSelected(input.current.length - 1);
+    const target: Target = { ...input.target, id: prefix + "-target", hole_id: mainHole.id, name: "Continue to landing point", horiz_tol: null, vert_tol: null, parent_target_id: null };
+    drafts.current[mainHole.id].targets = [target];
+    if (sampleProject) await saveTarget(target);
+    setTargets([target]); setAllTargets([target]); setSelectedTargetId(target.id);
+    setExtraPaths([]); setFlightPaths([]); setFlightSelection(null); setPlanStations([]);
+    setCaseTemplate({ ...input, offsets: input.offsets.map((o, i) => ({ ...o, id: all[i + 1].id })) }); setCollisionInput(null); setUncertainties(newUncertainty);
+    setWorkspace("collision"); setTab("3d"); setFocusAhead(true);
+    setStatus("Crossing example loaded into Survey, Flight Deck, Uncertainty and Clearance. Use active hole to check it.");
+  }
+
+  async function adoptRecoveryDemo(demo: RecoveryDemo) {
+    snapshotDraft();
+    if (dirty.current && project) await persist();
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    dirty.current = false;
+    const p = runtime === "browser" ? await getPlatform().repo.create({ name: demo.name, client: "Synthetic example" }) : null;
+    const h = makeHoleRec(crypto.randomUUID(), p?.id ?? "", "Curve Recovery · Active hole", { ...comparableDemoFrame(), azimuth_reference: "grid", vsp_deg: 45 });
+    const d: HoleDraft = { unit: "imperial", aziRef: "grid", vsp: 45, tie: { north: 0, east: 0, tvd: 0 }, targets: [],
+      rows: demo.surveys.map(s => ({ ...emptyRow(s.md), inc_deg: s.inc_deg, azi_deg: s.azi_deg, review_state: s.accepted ? "accepted" : "unreviewed", review_source: "synthetic", comment: "Constructed survey" })) };
+    const land = demo.plan.stations.slice(-1)[0];
+    if (land) d.targets = [{ ...land, id: crypto.randomUUID(), hole_id: h.id, name: "Landing target", horiz_tol: 50, vert_tol: 20, parent_target_id: null }];
+    if (p) await persistHoleDraft(h, d);
+    setProject(p); setHole(h); setHoles([h]); applyDraft(d); drafts.current[h.id] = d;
+    setAllTargets(d.targets); setSelected(d.rows.length - 1); setUncertainties({});
+    setCollisionInput(null); setCaseTemplate(null); setFlightSelection(null);
+    setPlanStations(demo.plan.stations.map(s => ({ ...s, dls_display: 0 })));
+    setExtraPaths([{ name: "PLANNED · Comparison plan", layer: "Comparison plan", color: "#b4a0e6", dash: "dash", points: demo.plan.stations }]);
+    setWorkspace("flightdeck"); setTab("3d"); setFocusAhead(true); setStatus(demo.name + " — " + demo.mark);
+  }
+
+  async function prepareCollision() {
+    if (!acceptedSensor || !hole) throw new Error("Accept a survey in the active hole first.");
+    const uncertainty = uncertainties[hole.id];
+    if (!uncertainty?.wholePath || uncertainty.unit !== unit)
+      throw new Error("Open Uncertainty and apply a source-labelled whole-path envelope for this hole before checking clearance.");
+    const start = flightSelection?.bit ?? acceptedSensor;
+    const target = targets.find(t => t.id === selectedTargetId) ?? targets[0];
+    const point = flightSelection?.path.slice(-1)[0] ?? planStations.slice(-1)[0] ?? (target ? {
+      ...target, md: start.md + Math.hypot(target.north - start.north, target.east - start.east, target.tvd - start.tvd), inc_deg: start.inc_deg, azi_deg: start.azi_deg,
+    } : null);
+    if (!point) throw new Error("Compare a next stand in Flight Deck, create a plan, or set a target for this hole to provide an endpoint.");
+    const frame = { unit_system: unit, north_reference: aziRef, origin_id: hole.origin_id, origin_north: hole.origin_north, origin_east: hole.origin_east, vertical_datum: hole.vertical_datum, vertical_datum_name: hole.vertical_datum_name, crs_epsg: hole.crs_epsg, crs_note: hole.crs_note };
+    const offsets: CollisionCase["offsets"] = [];
+    for (const other of holeList.filter(h => h.id !== hole.id)) {
+      const overlay = overlays.find(o => o.id === other.id);
+      const u = uncertainties[other.id];
+      if (!overlay || overlay.stations.length < 2) throw new Error("Load at least two survey stations for " + other.name + ".");
+      if (!u?.wholePath || u.unit !== unit) throw new Error("Choose " + other.name + " and apply its whole-path envelope in Uncertainty first.");
+      const draft = drafts.current[other.id];
+      if (!draft) throw new Error("Survey is still loading for " + other.name + ". Try again in a moment.");
+      const sampled = await engineCall<{ points: CollisionCase["current"]; chord_error_bound: number }>("sample_survey_path", {
+        input: { unit_system: draft.unit, convention: "oilfield_from_vertical", azimuth_reference: draft.aziRef, vsp_deg: draft.vsp, tie_in: draft.tie, stations: measuredOnly(draft.rows) },
+        tolerance: unit === "metric" ? 0.01 : 0.03,
+      });
+      offsets.push({ id: other.id, name: other.name, frame: { ...other, unit_system: other.unit_system as UnitSystem, north_reference: other.azimuth_reference }, ...sampled,
+        radius: caseTemplate?.offsets.find(o => o.id === other.id)?.radius ?? (unit === "metric" ? 0.16 : 0.525), envelope: envelopeFrom(u) });
+    }
+    if (!offsets.length) throw new Error("This project has no offset holes. Load the crossing example to see the complete workflow.");
+    const input: CollisionCase = {
+      name: hole.name + (flightSelection ? " · " + flightSelection.name : planStations.length ? " · route to plan endpoint" : " · target, same exit heading"), synthetic: !!caseTemplate?.synthetic,
+      frame, current: [...calcStations.filter(s => s.md <= acceptedSensor.md), ...(flightSelection?.estimatedPath.slice(1) ?? [])], start, target: point,
+      offsets, envelope: envelopeFrom(uncertainty), radius: caseTemplate?.radius ?? (unit === "metric" ? 0.16 : 0.525),
+      confidence: 0.95, margin: unit === "metric" ? 3 : 10, max_dls: 6,
+      max_excursion: unit === "metric" ? 60 : 200, chord_tolerance: unit === "metric" ? 0.01 : 0.03,
+    };
+    await engineCall("collision_analyze", input);
+    setCollisionInput(input); setCaseModelKey(collisionContextKey); setFocusAhead(true); setTab("3d");
+  }
+
   const delta = useMemo(() => {
     if (!pos || !selectedTarget) return null;
     return {
@@ -1229,7 +1428,8 @@ export default function App() {
   })();
 
   return (
-    <div className="app" onPaste={onPasteGrid}>
+    <div className={"app field-app workspace-" + workspace} onPaste={onPasteGrid}>
+      <ExplainMode enabled={tipsOn} />
       <div className="banner" role="note">
         Engineering prototype / evaluation software — not certified. Not regulator-approved. Not
         for collision avoidance, well control, or steering decisions. Minimum Curvature (ISCWSA).
@@ -1239,23 +1439,28 @@ export default function App() {
         {(
           [
             ["survey", "Survey"],
-            ["planning", "Planning"],
-            ["collision", "Anti-collision"],
             ["flightdeck", "Flight Deck"],
+            ["eou", "EOU"],
+            ["collision", "Anti-collision"],
+            ["planning", "Planning"],
             ["targets", "Targets"],
             ["centerline", "Centerline"],
             ["depth", "Depth"],
             ["reports", "Reports"],
-            ["eou", "EOU"],
           ] as const
         ).map(([id, label]) => (
-          <button key={id} type="button" className={workspace === id ? "on" : ""} onClick={() => setWorkspace(id)}>
-            {label}
+          <button key={id} type="button" aria-label={label} className={workspace === id ? "on" : ""} onClick={() => setWorkspace(id)}>
+            {id === "eou" ? "Uncertainty (EOU)" : id === "collision" ? "Clearance (anti-collision)" : label}
           </button>
         ))}
       </nav>
-      {workspace === "collision" && <CollisionWorkspace holeId={hole?.id ?? null} />}
-      <div className="legacy-workspace" hidden={workspace === "collision"}>
+      <div className="workflow-strip">
+        <span data-help="All steps use this same hole and coordinate system. Forecasts and uncertainty stay attached to their inputs."><b>{hole?.name ?? "Working hole"}</b> · {lengthLabel(unit)} · {aziRef} north</span>
+        {([["survey","1 · Survey"],["flightdeck","2 · Look ahead"],["eou","3 · Uncertainty"],["collision","4 · Clearance"]] as const).map(([id,label]) =>
+          <button key={id} aria-current={workspace === id ? "step" : undefined} onClick={() => { setWorkspace(id); if (tab === "target") setTab("3d"); }}>{label}</button>)}
+        <span>{flightSelection ? "Forecast: " + flightSelection.name : "No forecast selected"}</span>
+      </div>
+      <div className="legacy-workspace">
       <div className="toolbar">
         <span className="name">DELVEPATH</span>
         <button className="primary" onClick={() => setStartHere(true)}>
@@ -1263,13 +1468,13 @@ export default function App() {
         </button>
         <label className="tips-toggle">
           <input type="checkbox" checked={tipsOn} onChange={(e) => setTips(e.target.checked)} />
-          Tips
+          Explain mode
         </label>
         <button className="primary" onClick={() => void onNew()}>
           New
         </button>
         <button onClick={() => void onOpen()}>Open</button>
-        <button onClick={() => void persist()}>Save</button>
+        <button onClick={() => void saveWorkingProject()}>Save</button>
         {runtime === "browser" && (
           <>
             <button type="button" onClick={() => void exportBrowserSnapshot()}>
@@ -1595,92 +1800,31 @@ export default function App() {
                   unit={unit}
                   vspDeg={vsp}
                   onPlanStations={(stations, _name, paths) => {
+                    setFocusAhead(true); if (tab === "target") setTab("3d");
                     setPlanStations(stations);
                     setExtraPaths((prev) => [...prev.filter((p) => !p.name.startsWith("PLANNED")), ...paths]);
                   }}
                   onDocuments={(docs) => void persistDocuments(docs)}
                 />
               )}
-              {workspace === "flightdeck" && (
-                <FlightDeckWorkspace
-                  unit={unit}
-                  holeId={hole?.id ?? "demo-hole"}
-                  vspDeg={vsp}
-                  latestAccepted={rows.filter((r) => r.review_state === "accepted").slice(-1)[0]?.review_state}
-                  onDemoLoaded={(demo) => {
-                    setUnit("imperial");
-                    setAziRef("grid");
-                    setVsp(45);
-                    setTie({ tvd: 0, north: 0, east: 0 });
-                    setRows(
-                      demo.surveys.map((s) => ({
-                        ...emptyRow(s.md),
-                        id: crypto.randomUUID(),
-                        inc_deg: s.inc_deg,
-                        azi_deg: s.azi_deg,
-                        review_state: s.accepted ? "accepted" : "unreviewed",
-                        reviewer: s.accepted ? "demo" : "",
-                        review_source: "synthetic",
-                        reviewed_at: s.accepted ? "2026-08-28T00:00:00Z" : null,
-                        comment: s.accepted ? "ACCEPTED SURVEY" : "held-out until reveal",
-                      }))
-                    );
-                    if (hole) {
-                      setHole({
-                        ...hole,
-                        ...comparableDemoFrame(),
-                        azimuth_reference: "grid",
-                        unit_system: "imperial",
-                        vsp_deg: 45,
-                      });
-                    }
-                    const land = demo.plan.stations.slice(-1)[0];
-                    if (land) {
-                      const t: Target = {
-                        id: selectedTarget?.id ?? crypto.randomUUID(),
-                        hole_id: hole?.id ?? "",
-                        name: "Landing target",
-                        north: land.north,
-                        east: land.east,
-                        tvd: land.tvd,
-                        horiz_tol: 50,
-                        vert_tol: 20,
-                        parent_target_id: null,
-                      };
-                      setTargets([t]);
-                      setSelectedTargetId(t.id);
-                      fillForm(t);
-                    }
-                    setPlanStations(
-                      demo.plan.stations.map((s) => ({
-                        md: s.md,
-                        inc_deg: s.inc_deg,
-                        azi_deg: s.azi_deg,
-                        north: s.north,
-                        east: s.east,
-                        tvd: s.tvd,
-                        dls_display: 0,
-                      }))
-                    );
-                    setStatus(`${demo.name} — ${demo.mark}`);
-                    setWorkspace("flightdeck");
-                    scheduleSave();
-                  }}
-                  onPaths={(paths) =>
-                    setExtraPaths((prev) => [
-                      ...prev.filter(
-                        (p) =>
-                          !p.name.startsWith("PLANNED") &&
-                          !p.name.startsWith("ESTIMATED") &&
-                          !p.name.startsWith("SCENARIO") &&
-                          !p.name.startsWith("BHA")
-                      ),
-                      ...paths,
-                    ])
-                  }
-                  onDocuments={(docs) => void persistDocuments(docs)}
+              <div hidden={workspace !== "flightdeck"}>
+                <FlightDeckWorkspace unit={unit} sensor={acceptedSensor} modelKey={modelKey} holeName={hole?.name ?? "Working hole"} plan={planStations}
+                  onUpdate={receiveFlight} onNavigate={(next) => { setWorkspace(next); setTab("3d"); }}
+                  onDemoLoaded={adoptRecoveryDemo}
                 />
-              )}
+              </div>
+              <div hidden={workspace !== "collision"}>
+                <CollisionWorkspace holeId={hole?.id ?? null} sharedInput={collisionInput}
+                  stale={!!collisionInput && caseModelKey !== collisionContextKey}
+                  forecast={flightSelection} onUseActive={prepareCollision} onDemoLoaded={adoptCrossingCase}
+                  onPaths={receiveCollision} onNavigate={() => { setWorkspace("eou"); setTab("3d"); }}
+                  onUsePlan={(candidate) => {
+                    setPlanStations(candidate.points.map(s => ({ ...s, dls_display: candidate.summary.max_dls_bound })));
+                    setExtraPaths(prev => [...prev.filter(p => !p.name.startsWith("PLANNED")), { name: "PLANNED · Clearance correction", layer: "Comparison plan", color: "#b4a0e6", dash: "dash", points: candidate.points }]);
+                    setWorkspace("flightdeck"); setFocusAhead(true);
+                  }}
+                />
+              </div>
               {workspace === "targets" && (
                 <>
                   <label className="muted">
@@ -1743,8 +1887,16 @@ export default function App() {
                   vspDeg={vsp}
                   unit={unit}
                   holeId={hole?.id ?? ""}
-                  station={calcStations[selected] ?? null}
-                  onPaths={receiveEouPaths}
+                  station={uncertaintyStation} onPaths={receiveEouPaths}
+                  onUncertainty={receiveUncertainty} modelKey={modelKey} shared={uncertainties[hole?.id ?? ""]}
+                  onNavigate={() => { setWorkspace("collision"); setTab("3d"); }}
+                  locationControl={<label data-help="Choose the survey row or one of the currently selected forecast positions. The ellipsoid is placed on that exact point.">Place uncertainty at
+                    <select aria-label="Uncertainty location" value={uncertaintyAt} onChange={e => setUncertaintyAt(e.target.value)}>
+                      <option value="selected">Selected survey row</option><option value="latest">Last accepted survey</option>
+                      <option value="bit" disabled={!flightSelection}>Estimated bit now</option>
+                      <option value="future" disabled={!flightSelection}>Selected forecast endpoint</option>
+                    </select>
+                  </label>}
                 />
               </div>
             </div>
@@ -1821,7 +1973,8 @@ export default function App() {
         </div>
 
         <section className="viz">
-          <div className="tabs">
+          <div className="viewer-caption" aria-live="polite">{workspace === "collision" ? "Clearance · " + (collisionLabel || "Choose the active hole or load the crossing example") : flightSelection ? "Selected forecast · " + flightSelection.name : "Active hole · " + (hole?.name ?? "Working hole")}</div>
+          <div className="tabs" role="group" aria-label="Preview view">
             <button className={tab === "planView" ? "on" : ""} onClick={() => setTab("planView")}>
               <Tip id="planView" on={tipsOn}>
                 Plan
@@ -1843,6 +1996,7 @@ export default function App() {
               </Tip>
             </button>
           </div>
+          {workspace !== "eou" && workspace !== "survey" && aheadBounds && <div className="eou-view-controls"><button onClick={() => setFocusAhead(v => !v)}>{focusAhead ? "Show entire path" : "Focus ahead"}</button><span>Surveys · amber: estimate / hold · cyan: selected option · violet: comparison plan</span></div>}
           {workspace === "eou" && eouBounds && tab !== "target" && (
             <div className="eou-view-controls">
               <button onClick={() => setFocusEou((value) => !value)}>
@@ -2057,20 +2211,20 @@ export default function App() {
               )}
             </div>
           ) : (
-            workspace !== "collision" && <Suspense fallback={<p className="workspace-loading">Loading plots…</p>}>
+            <Suspense fallback={<p className="workspace-loading">Loading plots…</p>}>
               <Charts
                 tab={tab}
-                stations={calcStations}
-                overlays={overlays}
+                stations={showingCollision ? [] : calcStations}
+                overlays={showingCollision ? [] : overlays}
                 selected={Math.min(selected, Math.max(0, calcStations.length - 1))}
-                targets={allTargets.length ? allTargets : targets}
+                targets={showingCollision ? [] : allTargets.length ? allTargets : targets}
                 vspDeg={vsp}
                 currentHoleId={hole?.id ?? null}
                 onPickStation={(holeId, index) => void pickStation(holeId, index)}
-                extraPaths={extraPaths}
+                extraPaths={viewerPaths}
                 targetOutlines={targetOutlines}
                 profileTargetMode={profileTargetMode}
-                focusBounds={workspace === "eou" && focusEou ? eouBounds : undefined}
+                focusBounds={workspace === "eou" && focusEou ? eouBounds : workspace !== "survey" && focusAhead && aheadBounds ? aheadBounds : undefined}
                 unitLabel={lengthLabel(unit)}
               />
             </Suspense>

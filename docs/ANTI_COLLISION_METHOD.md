@@ -1,6 +1,6 @@
 # Anti-collision planning experiment: calculation specification
 
-Method identifier: `delvepath/bezier-envelope-screen/1`. Created by Philip Bird — Mithril Consulting. Independent implementation in `crates/delve-engine/src/collision.rs`; no proprietary solver or runtime service.
+Method identifier: `delvepath/bezier-envelope-screen/2`. Created by Philip Bird — Mithril Consulting. Independent implementation in `crates/delve-engine/src/collision.rs`; no proprietary solver or runtime service. Version 2 adds an explicit offset-curve approximation bound; old cases without this field mean supplied straight segments.
 
 **Engineering prototype / evaluation software — not certified. Not regulator-approved. Not for collision avoidance, well control, or steering decisions.**
 
@@ -25,6 +25,8 @@ All coordinates are local North/East/TVD, with TVD positive down. Inclination is
 The correction anchor must match the final supplied current state in position, MD and tangent. That state may be a supplied survey or an externally estimated bit state; the lab does not estimate sensor-to-bit distance. Target position and exit attitude are explicit. The target's input MD is not a constraint; generated MD follows arc length from the anchor.
 
 Offsets are explicitly supplied **polylines**, with increasing MD. No minimum-curvature interpolation is implied by this interchange format. Survey reconstruction remains in `delve-core`. Imported offset geometry must be resolved to adequate fidelity before using this lab. The reference curve's approximation bound does not cover unknown errors in imported offsets.
+
+The integrated **Use active hole & forecast** workflow reconstructs project offsets through `delve-core`, then samples each minimum-curvature circular arc. For course length L, dogleg β and n equal subintervals, the chord deviation is `2(L/β) sin²(β/(4n))`, bounded above by `Lβ/(8n²)`. The sampler chooses n to meet its tolerance (0.01 m or 0.03 ft), retains a whole-offset `chord_error_bound`, and rejects requests needing more than 2000 points. Straight intervals need only their endpoints. The interchange file records the resulting points and bound; it does not silently replace imported geometry.
 
 Each path has a physical hole/casing radius, a symmetric positive-semidefinite one-sigma covariance in length², provenance, and the literal coverage declaration `whole_path_constant_envelope`. This is a constant envelope asserted over the whole supplied interval, not an individual station covariance extrapolated downstream. No covariance is inferred when it is missing.
 
@@ -69,10 +71,10 @@ For covariance C and stated per-location confidence p, set:
 k = sqrt(χ²₃(p))
 R = k sqrt(λmax(C))
 required = Rreference + Roffset + holeRadiusReference + holeRadiusOffset + margin
-clearance lower bound = D − required − chordTolerance
+clearance lower bound = D − required − chordTolerance − offset.chord_error_bound
 ```
 
-Each ellipsoid is enclosed by its corresponding sphere. Subtracting the reference-curve approximation bound gives a conservative lower bound on separation of the geometric uncertainty/radius envelopes over the specified intervals. Positive or zero passes this configured geometric check; negative is inconclusive about actual ellipsoid intersection and is rejected by this conservative search.
+Each ellipsoid is enclosed by its corresponding sphere. Subtracting both curve-approximation bounds gives a conservative lower bound on separation of the geometric uncertainty/radius envelopes over the specified intervals. Positive or zero passes this configured geometric check; negative is inconclusive about actual ellipsoid intersection and is rejected by this conservative search.
 
 The ellipsoid confidence interpretation assumes a centered Gaussian positional-error model at each location. It is **not** joint confidence for an entire well, and it is not collision probability. No independence or cross-well correlation assumption is needed to state the geometric enclosing-sphere bound; a probabilistic interpretation of joint events would need much more information.
 

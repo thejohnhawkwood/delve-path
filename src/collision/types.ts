@@ -37,6 +37,7 @@ export interface CollisionCase {
     name: string;
     frame: Frame;
     points: Point[];
+    chord_error_bound?: number;
     radius: number;
     envelope: Envelope;
   }[];

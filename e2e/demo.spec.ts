@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("Oregon demo calculates and shows safety credit", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await expect(page.getByRole("heading", { name: /Directional survey calculation/i })).toBeVisible();
   await expect(page.getByText(/Created by Philip Bird — Mithril Consulting/).first()).toBeVisible();
   await expect(page.getByText(/not certified/i).first()).toBeVisible();
@@ -11,7 +11,7 @@ test("Oregon demo calculates and shows safety credit", async ({ page }) => {
 });
 
 test("dual-lateral overlays and projections stay labelled", async ({ page }) => {
-  await page.goto("/#workspace");
+  await page.goto("./#workspace");
   await page.getByRole("button", { name: "Load dual-lateral example" }).click();
   await expect(page.getByText(/SYNTHETIC dual-lateral loaded/).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("select").filter({ hasText: "Lateral B" })).toBeVisible();
@@ -19,19 +19,18 @@ test("dual-lateral overlays and projections stay labelled", async ({ page }) => 
   await expect(page.getByText("PROJECTED").first()).toBeVisible({ timeout: 10_000 });
 });
 
-test("Curve Recovery Flight Deck reveal scores frozen forecasts", async ({ page }) => {
-  await page.goto("/#workspace");
-  await page.getByRole("button", { name: "Flight Deck" }).click();
+test("Curve Recovery links selected forecasts to the viewer", async ({ page }) => {
+  await page.goto("./#workspace");
+  await page.getByRole("button", { name: "Flight Deck", exact: true }).click();
   await page.getByRole("button", { name: "Load Curve Recovery demo" }).click();
-  await expect(page.getByText(/Curve Recovery — Plan & Flight Deck/)).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/ACCEPTED SURVEY sensor MD/)).toBeVisible();
-  await page.getByRole("button", { name: "Reveal held-out synthetic survey" }).click();
-  await expect(page.getByText(/n → n\+1/)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/Forecasts stayed frozen/)).toBeVisible();
+  const choices = page.getByRole("group", { name: "Forecast choices" });
+  await expect(choices.getByRole("button", { name: /Your slide then rotate/ })).toHaveAttribute("aria-pressed", "true");
+  await choices.getByRole("button", { name: /Hold direction/ }).click();
+  await expect(page.locator(".viewer-caption")).toContainText("Hold direction");
 });
 
 test("source and Mithril links are safe", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   const source = page.getByRole("navigation", { name: "DelvePath" }).getByRole("link", { name: "Source" });
   await expect(source).toHaveAttribute("href", /https:\/\//);
   await expect(source).toHaveAttribute("rel", /noopener/);
@@ -40,7 +39,7 @@ test("source and Mithril links are safe", async ({ page }) => {
   const download = page.getByRole("navigation", { name: "DelvePath" }).getByRole("link", { name: "Windows Download" });
   await expect(download).toHaveAttribute(
     "href",
-    "https://drive.google.com/drive/folders/1nnhXHkcPL2cjl5L7wZVUMPQnb6cnc3_d?usp=sharing"
+    "https://github.com/thejohnhawkwood/delve-path/releases/download/v0.2.2/DelvePath_0.2.2_x64-setup.exe"
   );
   await expect(download).toHaveAttribute("rel", /noopener/);
   await expect(download).toHaveAttribute("target", "_blank");

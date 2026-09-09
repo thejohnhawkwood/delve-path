@@ -282,13 +282,47 @@ pub fn curve_recovery_demo() -> CurveRecoveryDemo {
 }
 
 pub fn demo_last_accepted_attitude() -> Attitude {
+    // Same MD/INC/AZI and tie-in as the survey grid; never a second hand-entered position.
+    let input = demo_survey_input();
+    let q = delve_core::evaluate_at_md(&input, 2400.0).expect("constructed survey");
     Attitude {
-        md: 2400.0,
-        inc_deg: 16.2,
-        azi_deg: 62.0,
-        north: 180.0,
-        east: 320.0,
-        tvd: 2385.0,
+        md: q.md,
+        inc_deg: q.inc_deg,
+        azi_deg: q.azi_deg,
+        north: q.north,
+        east: q.east,
+        tvd: q.tvd,
+    }
+}
+
+fn demo_survey_input() -> delve_core::HoleCalcInput {
+    delve_core::HoleCalcInput {
+        unit_system: UnitSystem::Imperial,
+        convention: delve_core::SurveyConvention::OilfieldFromVertical,
+        azimuth_reference: delve_core::AzimuthReference::Grid,
+        vsp_deg: 45.0,
+        tie_in: delve_core::TieIn {
+            north: 0.0,
+            east: 0.0,
+            tvd: 0.0,
+        },
+        stations: [
+            (0.0, 0.0, 45.0),
+            (650.0, 0.0, 45.0),
+            (1200.0, 8.0, 52.0),
+            (1800.0, 14.0, 58.0),
+            (2400.0, 16.2, 62.0),
+        ]
+        .into_iter()
+        .map(|(md, inc_deg, azi_deg)| delve_core::MeasuredStation {
+            md,
+            inc_deg,
+            azi_deg,
+            comment: String::new(),
+            class: StationClass::Measured,
+            source: delve_core::StationSource::Manual,
+        })
+        .collect(),
     }
 }
 
@@ -407,19 +441,30 @@ pub fn assert_demo_story(demo: &CurveRecoveryDemo) -> Result<DemoAssertions, Str
         created_at: "synthetic".into(),
         resolved_at: None,
     };
-    let actual = Attitude {
+    let mut actual_input = demo_survey_input();
+    actual_input.stations.push(delve_core::MeasuredStation {
         md: demo.held_out.md,
         inc_deg: demo.held_out.inc_deg,
         azi_deg: demo.held_out.azi_deg,
-        north: hold.future_bit.north + 12.0,
-        east: hold.future_bit.east - 8.0,
-        tvd: hold.future_bit.tvd + 1.0,
+        comment: "held-out synthetic survey".into(),
+        class: StationClass::Measured,
+        source: delve_core::StationSource::Manual,
+    });
+    let q =
+        delve_core::evaluate_at_md(&actual_input, demo.held_out.md).map_err(|e| e.to_string())?;
+    let actual = Attitude {
+        md: q.md,
+        inc_deg: q.inc_deg,
+        azi_deg: q.azi_deg,
+        north: q.north,
+        east: q.east,
+        tvd: q.tvd,
     };
     let scores = score_forecasts(&decision, demo.held_out.md, actual, &frozen);
     let frozen_ok = scores
         .iter()
         .all(|s| s.pre_update_memory_revision == demo.memory.revision)
-        && (frozen[0].1.inc_deg - hold.future_bit.inc_deg).abs() < 1e-12;
+        && (frozen[0].1.inc_deg - hold.next_sensor.inc_deg).abs() < 1e-12;
 
     Ok(DemoAssertions {
         hold_misses_corridor: hold_misses,

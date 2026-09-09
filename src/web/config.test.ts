@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT, desktopDownloadUrl, mithrilContactUrl, mithrilUrl, publicUrl, SAFETY, sourceUrl } from "./config";
+import { CREDIT, desktopDownloadUrl, desktopMeta, mithrilContactUrl, mithrilUrl, publicUrl, SAFETY, sourceUrl } from "./config";
 
 describe("public links", () => {
   it("uses safe Mithril and source URLs", () => {
@@ -17,9 +17,9 @@ describe("public links", () => {
     expect(publicUrl("/legal/LICENSE.txt")).toBe("/legal/LICENSE.txt");
   });
 
-  it("uses the approved Drive folder URL without rewriting it", () => {
+  it("downloads the installer matching the displayed release version", () => {
     expect(desktopDownloadUrl).toBe(
-      "https://drive.google.com/drive/folders/1nnhXHkcPL2cjl5L7wZVUMPQnb6cnc3_d?usp=sharing"
+      `https://github.com/thejohnhawkwood/delve-path/releases/download/v${desktopMeta.version}/${desktopMeta.filename}`
     );
   });
 });

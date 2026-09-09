@@ -7,9 +7,9 @@ Not regulator-approved. Not for collision avoidance, well control, or steering d
 
 Offline Windows evaluation app and public browser demo for minimum-curvature borehole survey reconstruction and geometric planning experiments. Results are **not** claimed bit-identical to WinSERVE.
 
-License: **Apache-2.0**. Current evaluation build: **0.2.1** (Plan & Flight Deck, viewer corrections).
+License: **Apache-2.0**. Current evaluation build: **0.2.2** (integrated field workflow).
 
-Public demo (planned): `https://delvepath.mithrilconsulting.io`
+Public demo: [Open DelvePath](https://thejohnhawkwood.github.io/delve-path/#workspace).
 
 ## What this build does
 
@@ -24,7 +24,8 @@ Public demo (planned): `https://delvepath.mithrilconsulting.io`
 - **Anti-collision lab:** layered current / uncorrected / correction / offset / uncertainty previews; 65 bounded geometric candidates; a three-hole crossing case; traceable audit export, saved runs and replay
 - **Targets:** plane + circle / rotated rectangle / polygon footprints rendered as real shapes
 - **Planning:** 2-D slant / S / horizontal and 3-D curve+hold constructors; editable plan table
-- **Flight Deck + BHA Memory:** ACCEPTED SURVEY / ESTIMATED bit / SCENARIO paths; held-out scoring; Shift Card
+- **Flight Deck:** accepted survey → estimated bit → selectable forecast; editing slide assumptions recalculates the visible path; export the complete comparison
+- **One field workflow:** Survey → Look ahead → Uncertainty → Clearance, with a shared viewer and Explain mode for mouse and keyboard
 - Centerline screening (not anti-collision), typed depth datums, offline imported EOU
 - Path colors (swatch next to Hole); combined color-coded survey table; click a plot point to select that row
 - Straight Line continuation / bit projection (hold last I/A), labelled **PROJECTED** (not WinSERVE BHL “trend of last two surveys”)
@@ -48,7 +49,7 @@ cargo install wasm-bindgen-cli --version 0.2.104 --locked
 
 Run `npm ci`, `npm run build:wasm`, then `npm run build` for the web artifact in `dist/`. Run `npm run tauri -- build` for the Windows release executable and NSIS installer:
 
-`target/release/bundle/nsis/DelvePath_0.2.1_x64-setup.exe`
+`target/release/bundle/nsis/DelvePath_0.2.2_x64-setup.exe`
 
 The installer is unsigned evaluation software. Existing external download folders may still contain older builds; local build success does not publish a release.
 
@@ -100,3 +101,5 @@ Start at `docs/PRD.md`, `docs/CALCULATION_SPEC.md`, `docs/MVP_ACCEPTANCE.md`, `d
 The current review is [docs/REVIEW_2026_09_08.md](docs/REVIEW_2026_09_08.md). Research, derivation and bounds are in [docs/ANTI_COLLISION_METHOD.md](docs/ANTI_COLLISION_METHOD.md).
 
 The 0.2.1 viewer/tab-switching correction is documented in [docs/VIEWER_FIX_0.2.1.md](docs/VIEWER_FIX_0.2.1.md).
+
+The 0.2.2 workflow, numerical corrections and verification steps are in [docs/FIELD_WORKFLOW_0.2.2.md](docs/FIELD_WORKFLOW_0.2.2.md).

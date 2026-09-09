@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FlightSelection } from "../fieldModel";
 import { engineCall, parseEngineError } from "../engine";
 import { getPlatform } from "../platform";
 import { loadDocuments, saveDocument } from "../api";
 import { fmt } from "../domain";
-import type { ExtraPath, ChartTab } from "../Charts";
+import type { ExtraPath } from "../Charts";
 import {
   glyphPaths,
   type Candidate,
@@ -20,10 +21,6 @@ import {
   type Audit,
 } from "../collision/audit";
 
-const Charts = lazy(() =>
-  import("../Charts").then((m) => ({ default: m.Charts })),
-);
-const EMPTY: never[] = [];
 const COLORS = {
   current: "#f0e9d8",
   baseline: "#e6b35a",
@@ -32,7 +29,11 @@ const COLORS = {
   clearance: "#ec9f92",
 };
 
-export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
+export function CollisionWorkspace({ holeId, sharedInput, stale, forecast, onUseActive, onDemoLoaded, onPaths, onNavigate, onUsePlan }: {
+  holeId: string | null; sharedInput: CollisionCase | null; stale: boolean; forecast: FlightSelection | null;
+  onUseActive: () => Promise<void>; onDemoLoaded: (input: CollisionCase) => Promise<void>;
+  onPaths: (paths: ExtraPath[], label?: string) => void; onNavigate: () => void; onUsePlan: (candidate: Candidate) => void;
+}) {
   const [input, setInput] = useState<CollisionCase | null>(null);
   const [baseline, setBaseline] = useState<Candidate | null>(null);
   const [generation, setGeneration] = useState<Generation | null>(null);
@@ -40,8 +41,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<ChartTab>("3d");
-  const [focus, setFocus] = useState(true);
+  const [forecastClearance, setForecastClearance] = useState<number | null>(null);
   const [glyphs, setGlyphs] = useState<ExtraPath[]>([]);
   const [editor, setEditor] = useState(false);
   const [json, setJson] = useState("");
@@ -58,9 +58,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
   const selected =
     generation?.alternatives.find((a) => a.summary.id === selectedId) ?? null;
   const displayBaseline = generation?.baseline ?? baseline;
-  const worst = displayBaseline?.encounters.reduce((a, b) =>
-    a.clearance_lower_bound < b.clearance_lower_bound ? a : b,
-  );
+
 
   function changeCase(next: CollisionCase) {
     sequence.current++;
@@ -76,20 +74,22 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
   }
   async function loadDemo() {
     try {
-      changeCase(await engineCall<CollisionCase>("collision_demo"));
+      await onDemoLoaded(await engineCall<CollisionCase>("collision_demo"));
     } catch (e) {
       setError(parseEngineError(e));
     }
   }
   useEffect(() => {
-    void loadDemo();
+    if (sharedInput) changeCase(sharedInput);
+    else { changeCasePlaceholder(); }
+    function changeCasePlaceholder() { setInput(null); setGeneration(null); setBaseline(null); onPaths([]); }
     return () => {
       sequence.current++;
       controller.current?.abort();
     };
-  }, []);
+  }, [sharedInput]);
   useEffect(() => {
-    if (!input) return;
+    if (!input || stale) { controller.current?.abort(); setBusy(false); return; }
     const seq = ++sequence.current;
     const abort = new AbortController();
     controller.current = abort;
@@ -110,7 +110,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
       window.clearTimeout(timer);
       abort.abort();
     };
-  }, [input]);
+  }, [input, stale]);
   useEffect(() => {
     setSaved([]);
     setSavedId("");
@@ -139,7 +139,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
   }, [holeId]);
 
   async function generate() {
-    if (!input) return;
+    if (!input || stale) return;
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -327,16 +327,17 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
     });
     return [...out, ...glyphs];
   }, [input, displayBaseline, selected, glyphs, unit]);
-  const focusBounds = useMemo(() => {
-    if (!focus || !worst) return undefined;
-    const p = worst.reference;
-    const span = unit === "ft" ? 120 : 36;
-    return {
-      north: [p.north - span, p.north + span] as [number, number],
-      east: [p.east - span, p.east + span] as [number, number],
-      tvd: [p.tvd - span, p.tvd + span] as [number, number],
-    };
-  }, [focus, worst, unit]);
+  const forecastMatches = input && forecast && JSON.stringify(input.start) === JSON.stringify(forecast.bit) && input.frame.unit_system === forecast.unit;
+  useEffect(() => { onPaths(stale ? [] : [...paths, ...(forecastMatches && forecast ? [{ name: "SCENARIO · " + forecast.name, layer: "Selected forecast", points: forecast.path, color: "#74b7ff", width: 5, dash: "dot" as const }] : [])], input?.name ?? ""); }, [paths, stale, onPaths, input?.name, forecastMatches, forecast]);
+  useEffect(() => {
+    let active = true;
+    setForecastClearance(null);
+    if (input && forecast && forecastMatches && !stale) void engineCall<{ clearance_lower_bound: number }[]>("screen_forecast", { case: input, points: forecast.path })
+      .then(encounters => { if (active) setForecastClearance(Math.min(...encounters.map(e => e.clearance_lower_bound))); })
+      .catch(e => { if (active) setError(parseEngineError(e)); });
+    return () => { active = false; };
+  }, [input, forecast, stale, forecastMatches]);
+  async function useActive() { try { setError(""); await onUseActive(); } catch(e) { setError(parseEngineError(e)); } }
 
   async function exportRun() {
     if (!generation) return;
@@ -428,21 +429,23 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
     }
   }
 
-  if (!input)
-    return (
-      <div className="collision-loading">
-        Loading the constructed crossing case…
-        {error && <p role="alert">{error}</p>}
-      </div>
-    );
+  if (!input) return <div className="workspace-panel field-panel">
+    <span className="eyebrow">4 · CHECK THE SPACE AHEAD</span><h2>Will this route crowd another hole?</h2>
+    <p>Use the active hole, its selected Flight Deck forecast, and the other holes in this project. Each hole needs a source-labelled uncertainty envelope.</p>
+    <div className="ws-row"><button className="primary" onClick={() => void useActive()}>Use active hole & forecast</button><button onClick={() => void loadDemo()}>Load crossing demo</button><button onClick={() => void importFile()}>Import case / audit</button></div>
+    <p>The crossing example loads three holes into Survey: a northbound active lateral, an eastbound crossing ahead, and a lower lateral that limits a downward detour. Start here for a complete walkthrough.</p>
+    {saved.length > 0 && <details><summary>Save, export &amp; replay</summary><p>These runs contain their own inputs. Replay reconstructs that recorded snapshot.</p><select aria-label="Saved collision run" value={savedId} onChange={e => setSavedId(e.target.value)}><option value="">Choose saved run…</option>{saved.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select><button disabled={!savedId} onClick={() => { const s = saved.find(s => s.id === savedId); if (s) void importText(s.payload); }}>Replay saved run</button></details>}
+    {error && <p role="alert" className="error">{error} <button onClick={onNavigate}>Open Uncertainty</button></p>}
+  </div>;
   return (
     <div className="collision-workspace">
       <header className="collision-header">
         <div>
           <span className="eyebrow">PLAN / ANTI-COLLISION LAB</span>
-          <h1>See the conflict. Shape the correction.</h1>
+          <h1>Will this route crowd another hole?</h1>
         </div>
         <div className="collision-actions">
+          <button onClick={() => void useActive()}>Use active hole & forecast</button>
           <button onClick={() => void loadDemo()}>Load crossing demo</button>
           <button onClick={() => void importFile()}>Import case / audit</button>
           <button
@@ -455,6 +458,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
           </button>
         </div>
       </header>
+      {stale && <div className="field-callout" role="status">The survey, forecast or uncertainty changed. This result is out of date. Use active hole &amp; forecast to refresh it.</div>}
       <div className="collision-layout">
         <aside className="collision-controls">
           <span className="case-badge">
@@ -464,9 +468,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
           </span>
           <h2>{input.name}</h2>
           <p className="muted">
-            The crossing lateral is ahead of the current state. The lower
-            lateral restricts a downward detour. Generate a path, compare the
-            correction, then inspect or export the calculation.
+            The viewer shows this case's recorded inputs. Amber is a route to the chosen endpoint; cyan is a generated correction. Use active hole &amp; forecast to refresh the case from your project.
           </p>
           <div className="collision-anchor">
             CURRENT MD{" "}
@@ -478,8 +480,10 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
               {fmt(input.start.azi_deg, 1)}°
             </span>
           </div>
+          {forecastClearance != null && <div className="field-callout">Selected Flight Deck forecast: <b>{forecast?.name}</b><p>Sampled path clearance: {fmt(forecastClearance)} {unit}. This checks the exact displayed forecast polyline; correction generation below explores new curves to the same endpoint.</p></div>}
           <fieldset>
             <legend>Path constraints</legend>
+            <label data-help="Physical radius of the active hole in the current length units, not its diameter. Added to both uncertainty envelopes and the clearance margin.">Active hole radius <input aria-label="Active hole radius" type="number" min="0" step="0.01" value={input.radius} onChange={e => changeCase({ ...input, radius: Number(e.target.value) })} /></label>
             {(
               [
                 ["max_dls", "Maximum dogleg", dlsUnit],
@@ -525,7 +529,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
           </fieldset>
           <button
             className="generate-path"
-            disabled={busy || !baseline}
+            disabled={busy || !baseline || stale}
             onClick={() => void generate()}
           >
             Generate drill path
@@ -581,11 +585,11 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
           <details>
             <summary>Save, export & replay</summary>
             <div className="collision-actions">
-              <button disabled={!generation} onClick={() => void exportRun()}>
+              <button disabled={!generation || stale} onClick={() => void exportRun()}>
                 Export audit JSON
               </button>
               <button
-                disabled={!selected || !generation}
+                disabled={!selected || !generation || stale}
                 onClick={() => {
                   if (generation)
                     void getPlatform()
@@ -600,7 +604,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
                 Export candidate CSV
               </button>
               <button
-                disabled={!generation || !holeId}
+                disabled={!generation || !holeId || stale}
                 onClick={() => void saveRun()}
               >
                 Save run to project
@@ -639,57 +643,16 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
             )}
           </details>
         </aside>
-        <main className="collision-preview">
-          <div className="collision-viewbar">
-            <div role="group" aria-label="Preview view">
-              {(
-                [
-                  ["planView", "Plan"],
-                  ["profile", "Profile"],
-                  ["3d", "3-D"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  className={tab === id ? "on" : ""}
-                  onClick={() => setTab(id)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button
-              className={focus ? "on" : ""}
-              onClick={() => setFocus(!focus)}
-            >
-              {focus ? "Show entire path" : "Focus crossing"}
-            </button>
-            <span>True scale · {unit} · TVD down</span>
-          </div>
-          <Suspense fallback={<p>Loading preview…</p>}>
-            <Charts
-              tab={tab}
-              stations={EMPTY}
-              overlays={EMPTY}
-              targets={EMPTY}
-              selected={0}
-              currentHoleId={null}
-              onPickStation={() => {}}
-              vspDeg={0}
-              extraPaths={paths}
-              focusBounds={focusBounds}
-              unitLabel={unit}
-            />
-          </Suspense>
+        <div className="collision-results">
           <div className="collision-comparison">
             <div className="comparison-card baseline">
-              <span>UNCORRECTED ROUTE</span>
+              <span>ROUTE TO ENDPOINT</span>
               <strong>
                 {displayBaseline
                   ? `${fmt(displayBaseline.summary.min_clearance_bound)} ${unit}`
                   : "—"}
               </strong>
-              <small>Conservative envelope clearance bound</small>
+              <small>Space left after uncertainty, hole sizes and margin. Negative means the entered spacing is not met; it does not prove a physical collision.</small>
               <b>
                 {displayBaseline?.summary.meets_constraints
                   ? "Meets configured geometry"
@@ -697,6 +660,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
               </b>
             </div>
             <div className="comparison-card correction">
+              <button disabled={!selected || stale} onClick={() => { if (selected) onUsePlan(selected); }} data-help="Keep this geometric correction as the comparison plan in Flight Deck. It stays a planned route; survey rows are unchanged.">Use correction as comparison plan</button>
               <span>CORRECTION CANDIDATE</span>
               <strong>
                 {selected
@@ -730,7 +694,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
                   ? `${generation.ledger.length} candidates · ${generation.ledger.filter((c) => c.meets_constraints).length} pass configured checks`
                   : `${input.offsets.length} offsets · uncertainty + hole radii + margin`}
               </p>
-              <button disabled={!generation} onClick={() => setReport(true)}>
+              <button disabled={!generation || stale} onClick={() => setReport(true)}>
                 Inspect calculation & report
               </button>
               <small>
@@ -739,7 +703,7 @@ export function CollisionWorkspace({ holeId }: { holeId: string | null }) {
               </small>
             </div>
           </div>
-        </main>
+        </div>
       </div>
       {editor && (
         <div className="modal-back">
