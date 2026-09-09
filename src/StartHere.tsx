@@ -5,7 +5,7 @@ interface Props {
   onLoadOregon: () => void;
   onLoadDual: () => void;
   onSampleTarget: () => void;
-  onGoTab: (tab: "plan" | "profile" | "3d" | "target") => void;
+  onGoTab: (tab: "planView" | "profile" | "3d" | "target") => void;
   tipsOn: boolean;
   onTips: (on: boolean) => void;
   runtime?: "tauri" | "browser";
@@ -48,6 +48,10 @@ const STEPS: { title: string; body: string; action?: "oregon" | "dual" | "target
     title: "Project ahead",
     body: "Bottom bar: Straight Line holds the last INC/AZI. Try bit-to-sensor 60, then +MD 200. The banner says PROJECTED and the path is dashed amber. This is not WinSERVE’s “trend of last two surveys.” Set the menu back to None when you are done.",
   },
+  {
+    title: "Plan & Flight Deck",
+    body: "Open Flight Deck and load Curve Recovery — Plan & Flight Deck (SYNTHETIC / constructed). You will see accepted sensor vs estimated bit, then compare hold and slide scenarios. Reveal the held-out survey to score frozen forecasts. Planning, Targets, Centerline, Depth, and Reports are separate workspaces. Centerline is screening only — not anti-collision.",
+  },
 ];
 
 export function StartHere({ onClose, onLoadOregon, onLoadDual, onSampleTarget, onGoTab, tipsOn, onTips, runtime }: Props) {
@@ -61,7 +65,7 @@ export function StartHere({ onClose, onLoadOregon, onLoadDual, onSampleTarget, o
       onGoTab("target");
       onSampleTarget();
     }
-    if (step.action === "plan") onGoTab("plan");
+    if (step.action === "plan") onGoTab("planView");
     if (step.action === "profile") onGoTab("profile");
     if (step.action === "3d") onGoTab("3d");
   }

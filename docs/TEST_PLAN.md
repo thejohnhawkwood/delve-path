@@ -3,11 +3,13 @@
 Commands (repo root):
 
 ```text
-npm run test-core      # cargo test -p delve-core
-npm run test-golden    # cargo test -p delve-core -- golden
+cargo test -p delve-core -p delve-planning -p delve-assurance -p delve-engine -p delve-storage
 npm run test-ui        # vitest
-npm run test-all       # core + golden + ui + production build
+npm run test-e2e       # Playwright including Curve Recovery reveal
+npm run build:wasm && npm run build
 ```
+
+Existing delve-core synthetic and golden suites must stay unchanged. New crates cover projections, plans, Flight Deck, targets, centerline, depth, and imported covariance.
 
 `test-all` fails if any of those fail. Golden failures are errors, not warnings.
 
@@ -39,3 +41,10 @@ Enter/paste a short survey; current position updates; views highlight the same s
 ## Air-gap
 
 Documented procedure. Installer may be **NOT YET VALIDATED** in this pass if only a dev build exists.
+
+
+## Collision evaluation verification
+
+Run `npm run verify:collision` after rebuilding WASM. It compares native and WASM results and writes repeatable synthetic evidence under `artifacts/verification/`. `e2e/collision.spec.ts` exercises correction generation, every preview view, real ellipsoid layers, input invalidation, infeasible constraints, offline recalculation, file audit export/replay, and saved-run reload. `src/collision/audit.test.ts` checks input/result tamper detection and planned-only CSV output. Rust tests independently exercise segment intersections, curvature/flatness/arc-length bounds, units, NIST quantiles, rotated covariance, and bounded centerline refinement. All four existing survey goldens retain their tolerances.
+
+CI now includes a Windows NSIS build and uploads calculation/browser evidence; remote CI has not run until the branch is pushed.

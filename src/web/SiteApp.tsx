@@ -66,9 +66,11 @@ export function SiteApp() {
           <p className="eyebrow">Mithril Consulting proof of work</p>
           <h1>Directional survey calculation you can actually run.</h1>
           <p className="lede">
-            DelvePath reconstructs a borehole from MD, INC, and AZI with Minimum Curvature
-            (ISCWSA). The same Rust engine that powers the Windows field app runs here in
-            WebAssembly. Work stays on this device.
+            DelvePath 0.2 is an offline Plan & Flight Deck workspace: accepted surveys, estimated
+            bit, user-authored scenarios, planning constructors, target geometry, centerline
+            screening, depth datums, and handover reports. The anti-collision lab adds layered
+            uncertainty previews and traceable geometric correction candidates. The same Rust engines run in the
+            Windows field app and here in WebAssembly. Work stays on this device.
           </p>
           <p className="banner site-banner">{SAFETY}</p>
           <div className="hero-actions">
@@ -126,9 +128,10 @@ export function SiteApp() {
         <section className="guided" id="start">
           <h2>Guided demo</h2>
           <p>
-            Use <strong>Start here</strong> in the workspace, then load the public Oregon
-            example or the constructed dual-lateral. Switch holes, set a target, and turn on a
-            Straight Line projection — projected stations stay labelled <strong>PROJECTED</strong>.
+            Use <strong>Start here</strong>, then load Oregon, the dual-lateral, or{" "}
+            <strong>Curve Recovery — Plan & Flight Deck</strong>. Reveal the held-out synthetic
+            survey to score frozen forecasts. Open <strong>Anti-collision</strong> and select <strong>Generate drill path</strong> to explore the constructed crossing-lateral case and inspect its calculation audit. Projected stations stay labelled{" "}
+            <strong>PROJECTED</strong>.
           </p>
         </section>
 
@@ -142,9 +145,10 @@ export function SiteApp() {
           <h2>What this demonstrates</h2>
           <ul>
             <li>Minimum Curvature survey reconstruction from measured MD / INC / AZI.</li>
-            <li>Parent wellbore plus a sidetrack tied on at a selected measured station.</li>
-            <li>Plan, profile, and interactive 3-D views from the calculated path — not a screenshot.</li>
-            <li>One Rust engine (`delve-core`) for desktop and browser. No second TypeScript solver.</li>
+            <li>Planning constructors, Flight Deck scenarios, and BHA Memory held-out scoring.</li>
+            <li>True target footprints, centerline screening, and typed depth datums.</li>
+            <li>Layered anti-collision evaluation: explicit uncertainty envelopes, bounded geometric candidates, and reproducible audit export. No operational steering commands.</li>
+            <li>One Rust engine family (`delve-core`, `delve-planning`, `delve-assurance`) for desktop and browser. No second TypeScript solver.</li>
             <li>
               Automated tests: synthetic L1 cases, WinSERVE / COMPASS / HawkEye goldens within
               documented print-precision tolerances, storage migrations, and browser snapshot checks.

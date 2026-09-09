@@ -1,6 +1,6 @@
 [package]
 name = "delvepath"
-version = "0.1.1"
+version = "0.2.1"
 edition.workspace = true
 license.workspace = true
 
@@ -13,6 +13,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 delve-core.workspace = true
+delve-engine.workspace = true
 delve-storage.workspace = true
 serde.workspace = true
 serde_json.workspace = true

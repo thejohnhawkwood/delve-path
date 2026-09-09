@@ -1,4 +1,5 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import type { FileOperations } from "../types";
 
 export const tauriFiles: FileOperations = {
@@ -17,9 +18,9 @@ export const tauriFiles: FileOperations = {
     }) as Promise<string | null>;
   },
   pickTextFile() {
-    return Promise.reject(new Error("Use the desktop CSV import control."));
+    return invoke<{ name: string; text: string } | null>("import_text_file");
   },
-  async saveTextFile() {
-    throw new Error("Use the desktop CSV export control.");
+  async saveTextFile(filename, text) {
+    await invoke("export_text_file", { filename, text });
   },
 };

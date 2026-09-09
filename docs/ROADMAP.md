@@ -1,14 +1,12 @@
 # Roadmap
 
-## MVP (this pass)
+## 0.2 (this pass)
 
-Survey reconstruction, grid, views, point target, simple tangent projection, local SQLite, CSV/report, offline-capable architecture.
+Plan & Flight Deck: projections, planning constructors, target geometry, Flight Deck + BHA Memory, centerline screening, depth datums, report models, offline EOU import. Geocertainty live HTTP remains NOT YET VALIDATED.
 
-## V1
+## Later
 
-Plan vs actual, plan import, sourced projection tools (Straight Line already in MVP), mining **report-only** INC display if a paired print exists, mining import only after a sourced Micromine-style conversion, richer reports.
-
-Sidetrack / multi-hole (selected-station kick-off, overlay, multi-target) is in the prototype. Still open: DSR interpolated station at an arbitrary kick-off MD; WinSERVE copy/append definitive list; TAML hardware.
+ISCWSA Rev 5 propagation (not just import), optional connected desktop Geocertainty after token + payload confirm, interpolated kick-off MD, mining import after a sourced conversion.
 
 ## Platform (later)
 
@@ -17,3 +15,8 @@ Optional sync, Office web, roles, audit. Not required by the field app.
 ## Never in MVP
 
 Items in implementation prompt §34 (cloud, WITS, ISCWSA PU, AC, geology, AI calc, …).
+
+
+## 2026-09-08 review update
+
+Implemented the bounded geometric collision lab, uncertainty layers, constructed crossing case, audit/replay and desktop text artifact flow. Preserve the historical gaps: a full per-section lock/solve planning ledger, validated survey-tool covariance propagation, operational anti-collision policies, and BHA-controlled path following still require separate design and validation. The candidate generator does not close those gaps by implication.

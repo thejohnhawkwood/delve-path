@@ -14,7 +14,8 @@ src/platform   (CalculationService + ProjectRepository + files)
     crates/delve-wasm   (wasm-bindgen only)
          │
          ▼
-    delve-core     (pure Rust domain + min curvature)
+    delve-core / delve-planning / delve-assurance   (pure Rust)
+    delve-engine   (JSON dispatch for WASM + Tauri)
 ```
 
 Desktop still hosts through Tauri 2 + `delve-storage`. The browser never opens SQLite.
@@ -25,11 +26,16 @@ Desktop still hosts through Tauri 2 + `delve-storage`. The browser never opens S
 
 ```text
 crates/delve-core
+crates/delve-planning
+crates/delve-assurance
+crates/delve-engine
 crates/delve-storage
 src-tauri          # Tauri host
-src                # React
+src                # React workspaces
 tests/fixtures     # copies/links of golden CSVs + provenance
 ```
+
+Survey reconstruction stays in `delve-core`. Forward projections, plans, and Flight Deck live in `delve-planning`. Target geometry, depth, centerline, and imported covariance live in `delve-assurance`. There is no second TypeScript math engine.
 
 ## Canonical internal model (locked for MVP)
 
@@ -70,3 +76,8 @@ Plotly.js bundled locally (MIT). Views consume `delve-core` results; they do not
 ## Future (not built)
 
 Optional sync Field SQLite → cloud → Office web. Enabled by UUIDs, migrations, and a pure core — not by a sync framework.
+
+
+## Anti-collision evaluation slice (2026-09-08)
+
+`delve-engine::collision` implements the bounded curve search and conservative envelope checks; `delve-engine::uncertainty` emits mesh and projection geometry. Both are pure Rust and reachable through the existing JSON dispatch on Tauri and WASM. `src/collision/` holds typed transport, an embedded cancellable browser worker, and audit/CSV serialization. The worker receives the already compiled WASM module, so it needs no subsequent asset fetch. Tauri runs engine requests off the UI thread and provides dialog-scoped text import/export. No server or network permission was added. See [method and research](ANTI_COLLISION_METHOD.md).

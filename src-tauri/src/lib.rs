@@ -3,7 +3,9 @@ use delve_core::{
     MeasuredStation, StationClass, StationSource, SurveyConvention, TieIn, Trajectory, UnitSystem,
     ValidationIssue,
 };
-use delve_storage::{new_id, HoleRecord, ProjectRecord, StationRecord, Store, TargetRecord};
+use delve_storage::{
+    new_id, DocumentRecord, HoleRecord, ProjectRecord, StationRecord, Store, TargetRecord,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -202,6 +204,79 @@ fn new_uuid() -> String {
     new_id()
 }
 
+#[tauri::command]
+async fn engine_call(req: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || delve_engine::engine_call_json(&req))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// File access is confined to a path chosen through the native dialog for this call.
+#[tauri::command]
+async fn export_text_file(
+    app: tauri::AppHandle,
+    filename: String,
+    text: String,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    if text.len() > 64 * 1024 * 1024 {
+        return Err("Export exceeds 64 MB.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let name = std::path::Path::new(&filename)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("delvepath-export.json");
+        let Some(file) = app.dialog().file().set_file_name(name).blocking_save_file() else {
+            return Ok(false);
+        };
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        std::fs::write(path, text).map_err(|e| e.to_string())?;
+        Ok(true)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn import_text_file(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(file) = app.dialog().file().add_filter("JSON / CSV / text", &["json", "csv", "txt"]).blocking_pick_file() else { return Ok(None); };
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 25 * 1024 * 1024 { return Err("Import exceeds 25 MB.".into()); }
+        let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        Ok(Some(serde_json::json!({ "name": path.file_name().unwrap_or_default().to_string_lossy(), "text": text })))
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn save_document(state: State<AppState>, doc: DocumentRecord) -> Result<(), String> {
+    let guard = state.store.lock().unwrap();
+    let store = guard.as_ref().ok_or("No project open")?;
+    store.upsert_document(&doc).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_documents(
+    state: State<AppState>,
+    hole_id: String,
+    kind: Option<String>,
+) -> Result<Vec<DocumentRecord>, String> {
+    let guard = state.store.lock().unwrap();
+    let store = guard.as_ref().ok_or("No project open")?;
+    store
+        .list_documents(&hole_id, kind.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_document(state: State<AppState>, id: String) -> Result<(), String> {
+    let guard = state.store.lock().unwrap();
+    let store = guard.as_ref().ok_or("No project open")?;
+    store.delete_document(&id).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -228,7 +303,13 @@ pub fn run() {
             list_holes,
             delete_target,
             delete_hole,
-            new_uuid
+            new_uuid,
+            engine_call,
+            export_text_file,
+            import_text_file,
+            save_document,
+            load_documents,
+            delete_document
         ])
         .run(tauri::generate_context!())
         .expect("error while running DelvePath");

@@ -14,7 +14,8 @@ export const GLOSSARY = {
   dls: "Dogleg severity — curvature of the last interval, in °/100 ft or °/30 m. Not a relabel of the other unit.",
   tie: "Tie-in — starting station: MD/INC/AZI plus known TVD/N/E. Later stations accumulate from here.",
   convention: "How inclination is defined. This build is oilfield from vertical only. Mining dip import is refused.",
-  units: "Display units. Internally the engine uses metres and radians. Feet and °/100 ft are converted, not relabelled.",
+  units: "Changing units converts every stored length. Silent relabelling is forbidden once data exist.",
+  review: "unreviewed | accepted | excluded. Existing rows migrate to unreviewed. Flight Deck anchors require accepted.",
   aziRef: "Which north the azimuths are already in. Declination and grid are notes only — they are not applied.",
   project: "Desktop: a local *.delvepath SQLite file. Browser: an IndexedDB project on this device, optionally exported as .delvepath.json. Not a WinSERVE .SVY. The two file types are not interchangeable.",
   hole: "One borehole inside the project. A parent wellbore or a sidetrack/lateral. Surveys and targets belong to the hole.",
@@ -28,7 +29,7 @@ export const GLOSSARY = {
   planView: "Map view: +North up, +East right, equal scale. Solid = measured, dashed amber = projected, red X = target.",
   profileView: "Section view: vertical section vs TVD, with TVD increasing down the screen (view only).",
   view3d: "Orbit the well in East / North / TVD. No geology.",
-  target: "A point objective in N, E, and TVD. Deltas are numeric. High/low–left/right needs a plan (not in this build).",
+  target: "Target plane plus in-plane footprint. Circle input is radius. A dipped circle may appear elliptical in Plan.",
   junction: "Parent target at the kick-off / branch point (N/E/TVD). Lateral targets hang off it as children. Not TAML hardware.",
   straight: "Straight Line projection — hold last INC and AZI. Same idea as WinSERVE Straight Line to MD/TVD. Not BHL trend.",
   bit: "Bit-to-sensor — along-hole distance from the survey tool to the bit. Here it is a Straight Line hold, not WinSERVE BHL trend.",
@@ -37,6 +38,10 @@ export const GLOSSARY = {
   oregon: "Public Oregon WinSERVE filing 24c-23-65. Feet, VSP 165.30°, tie-in MD = TVD = 445.",
   comment: "Free text on a station (tie-in note, interpolated, plug-back). Does not change the math.",
   class: "measured, projected, or planned. Projections must not look like surveys.",
+  flightDeck: "ACCEPTED SURVEY is user-reviewed MD/INC/AZI. ESTIMATED is the bit under entered BHA/drilling assumptions. SCENARIO is a user-authored candidate — never recommended or execute.",
+  centerline: "Centerline separation screening only. Not a separation factor, MASD, probability of collision, or a safe/unsafe result.",
+  eou: "Imported one-sigma NEV covariance. Not DelvePath-certified ISCWSA Rev 5 propagation. Distinct from a BHA response envelope.",
+  depthDatum: "Typed depth with provenance. TVD MSL is positive down; Elevation MSL is positive up. Wireline is a mapping, not automatically a datum shift.",
 } as const;
 
 export type GlossaryId = keyof typeof GLOSSARY;

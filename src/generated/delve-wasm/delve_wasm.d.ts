@@ -5,12 +5,14 @@ export function validate_survey(req: any): any;
 export function project_tangent_md(req: any, added_md: number): any;
 export function project_tangent_tvd(req: any, target_tvd: number): any;
 export function project_tangent_bit(req: any, bit_to_sensor: number): any;
+export function engine_call(req: string): string;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly calculate: (a: any) => [number, number, number];
+  readonly engine_call: (a: number, b: number) => [number, number, number, number];
   readonly project_tangent_bit: (a: any, b: number) => [number, number, number];
   readonly project_tangent_md: (a: any, b: number) => [number, number, number];
   readonly project_tangent_tvd: (a: any, b: number) => [number, number, number];
@@ -21,6 +23,7 @@ export interface InitOutput {
   readonly __externref_table_alloc: () => number;
   readonly __wbindgen_export_4: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_start: () => void;
 }
 

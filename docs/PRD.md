@@ -25,7 +25,8 @@ Primary: directional field operators on Windows laptops (including 1366×768). Z
 - **Targets:** junction (parent) and child lateral targets; numeric deltas; visible on plots
 - Path colors (subtle swatch); combined color-coded survey table; plot click selects the matching row
 - Straight Line continuation / bit projection (labelled; not WinSERVE BHL trend). Projections never written as measured.
-- SQLite persistence (`*.delvepath`), autosave, reopen (schema migrations through v4)
+- SQLite persistence (`*.delvepath`), autosave, reopen (schema migrations through v5); browser snapshots v2 with v1 migration
+- Planning constructors, Flight Deck + BHA Memory, shaped targets, centerline screening, typed depth datums, offline imported EOU, handover reports
 - CSV import/export (one hole per file) and printable survey report
 - Glossary mouseover tips that stay inside the window; Start Here walkthrough
 - Oregon public golden demo; constructed dual-lateral demo
@@ -33,10 +34,15 @@ Primary: directional field operators on Windows laptops (including 1366×768). Z
 
 ## Out of scope
 
-Cloud/sync, WITS, geodesy engine, magnetic models, ISCWSA uncertainty, anti-collision, well-plan solvers, geology, mining-convention conversion, WinSERVE binary, undocumented projection solvers, AI calculations, TAML junction hardware, DSR interpolated kick-off at an arbitrary MD (selected measured row only), WinSERVE copy/append of the parent curve into the lateral.
+Cloud/sync, WITS, geodesy engine, magnetic models, ISCWSA Rev 5 uncertainty *propagation*, anti-collision / SF / MASD / PoC, live Geocertainty HTTP (import-only; NOT YET VALIDATED), geology, mining-convention conversion, WinSERVE binary, undocumented proprietary solvers, AI calculations, TAML junction hardware, DSR interpolated kick-off at an arbitrary MD, WinSERVE copy/append of the parent curve into the lateral.
 
 ## Success
 
 See `docs/MVP_ACCEPTANCE.md`. Prototype banner must be visible.
 
 Status words in docs and UI notes: **WORKING** · **VALIDATED** · **NOT YET VALIDATED** · **SYNTHETIC / constructed**.
+
+
+## Anti-collision evaluation lab
+
+The current proof of concept includes a deterministic three-hole crossing case, a generated correction pathway, independently toggled preview layers, and reproducible calculation audits in both web and Windows. Its metric is conservative geometric clearance with explicit whole-path covariance envelopes and radius/margin inputs. Operational anti-collision, ISCWSA survey-tool error propagation and motor/RSS steering remain outside the implementation. See [method](ANTI_COLLISION_METHOD.md) and [review](REVIEW_2026_09_08.md).

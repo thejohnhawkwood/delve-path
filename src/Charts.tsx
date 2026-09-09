@@ -1,9 +1,30 @@
-import { useEffect, useRef } from "react";
-import Plotly from "plotly.js-dist-min";
+import { useEffect, useRef, useState } from "react";
+import { usePlotlyView } from "./plotlyView";
+import { boundsFor3d } from "./chartBounds";
 import { PARENT_HOLE_COLOR } from "./colors";
 import type { CalculatedStation, Target } from "./domain";
 
-type Tab = "plan" | "profile" | "3d" | "target";
+export type ChartTab = "planView" | "profile" | "3d" | "target";
+
+export interface ExtraPath {
+  name: string;
+  color: string;
+  dash?: "solid" | "dash" | "dot";
+  layer?: string;
+  width?: number;
+  opacity?: number;
+  view?: ChartTab;
+  fill?: boolean;
+  mesh?: { vertices: [number, number, number][]; triangles: [number, number, number][] };
+  points: { north: number; east: number; tvd: number; vs?: number }[];
+}
+
+export interface TargetOutlineTrace {
+  name: string;
+  world: [number, number, number][];
+  section: [number, number][];
+  projection: [number, number][];
+}
 
 export interface HoleOverlay {
   id: string;
@@ -14,7 +35,7 @@ export interface HoleOverlay {
 }
 
 interface Props {
-  tab: Tab;
+  tab: ChartTab;
   stations: CalculatedStation[];
   overlays: HoleOverlay[];
   selected: number;
@@ -22,9 +43,12 @@ interface Props {
   vspDeg: number;
   currentHoleId: string | null;
   onPickStation: (holeId: string, index: number) => void;
+  extraPaths?: ExtraPath[];
+  targetOutlines?: TargetOutlineTrace[];
+  profileTargetMode?: "intersection" | "projection";
+  focusBounds?: { north: [number, number]; east: [number, number]; tvd: [number, number] };
+  unitLabel?: string;
 }
-
-const plotCfg = { displayModeBar: false, responsive: true, staticPlot: false };
 
 type PickPoint = { holeId: string; stationIndex: number };
 
@@ -37,15 +61,23 @@ export function Charts({
   vspDeg,
   currentHoleId,
   onPickStation,
+  extraPaths = [],
+  targetOutlines = [],
+  profileTargetMode = "projection",
+  focusBounds,
+  unitLabel = "",
 }: Props) {
-  const el = useRef<HTMLDivElement>(null);
-  const lastTab = useRef<Tab | null>(null);
-  const plotSeq = useRef(0);
-  const plotTail = useRef(Promise.resolve());
+  const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
+  const { element: el, render, error, retry } = usePlotlyView();
   const pickRef = useRef(onPickStation);
   pickRef.current = onPickStation;
 
   const paths = pathsForPlot(overlays, stations, currentHoleId);
+  const layerOf = (p: ExtraPath) => p.layer ?? (p.name.startsWith("EOU") ? "Uncertainty" : p.name.split(" ")[0]);
+  const layers = [...new Map([
+    ...paths.map((p) => [`survey:${p.id}`, { label: p.name, color: p.color }] as const),
+    ...extraPaths.map((p) => [layerOf(p), { label: layerOf(p), color: p.color }] as const),
+  ]).entries()];
   const projected = stations.filter((s) => s.class !== "measured");
   const sel = stations[selected];
   const hasKick = paths.some((h) => h.parent_hole_id && h.stations.some((s) => s.class === "measured"));
@@ -59,17 +91,13 @@ export function Charts({
     ...(hasJunction ? [{ color: "#e0c36a", label: "Junction" }] : []),
     ...(hasTarget ? [{ color: "#c44b3c", label: "Target" }] : []),
     ...(sel ? [{ color: "#6f8fbf", label: "Selected" }] : []),
+    ...extraPaths.filter((p) => !p.layer && !p.view).slice(0, 8).map((p) => ({ color: p.color, label: p.name })),
   ];
 
   useEffect(() => {
-    const node = el.current;
-    if (!node || tab === "target") {
-      if (node) Plotly.purge(node);
-      lastTab.current = tab;
-      return;
-    }
-    const seq = ++plotSeq.current;
-    const plotPaths = pathsForPlot(overlays, stations, currentHoleId);
+    if (tab === "target") return;
+    const plotPaths = pathsForPlot(overlays, stations, currentHoleId).filter((p) => !hiddenLayers.includes(`survey:${p.id}`));
+    const visibleExtras = extraPaths.filter((p) => (!p.view || p.view === tab) && !hiddenLayers.includes(layerOf(p)));
     const plotMeasured = stations.filter((s) => s.class === "measured");
     const plotProjected = stations.filter((s) => s.class !== "measured");
     const plotSel = stations[selected];
@@ -96,12 +124,11 @@ export function Charts({
       pickRef.current(cd.holeId, cd.stationIndex);
     };
 
-    const crossed3d = lastTab.current !== tab && (lastTab.current === "3d" || tab === "3d");
-    if (crossed3d) Plotly.purge(node);
-    const entering3d = tab === "3d" && lastTab.current !== "3d";
-    lastTab.current = tab;
+    const draw = (data: unknown[], layout: Record<string, unknown>) => render({
+      data, layout, mode: tab, onReady: (node) => bindPlotEvents(node, click),
+    });
 
-    if (tab === "plan") {
+    if (tab === "planView") {
       const data = [
         ...plotPaths.flatMap((h) => holePlanTraces(h)),
         ...projPlan(plotMeasured, plotProjected),
@@ -120,24 +147,38 @@ export function Charts({
             ? branchMark2d(t.east, t.north, t.name || "Junction")
             : targetMark2d(t.east, t.north, t.name || "Target")
         ),
+        ...visibleExtras.map((p) =>
+          extraLine2d(
+            p.points.map((q) => q.east),
+            p.points.map((q) => q.north),
+            p
+          )
+        ),
+        ...targetOutlines.map((o) =>
+          line2d(
+            o.world.map((q) => q[1]),
+            o.world.map((q) => q[0]),
+            `${o.name} footprint`,
+            "#c44b3c",
+            "solid"
+          )
+        ),
       ];
-      enqueuePlot(seq, () =>
-        Plotly.react(
-          node,
+        draw(
           data.filter((d) => d && "type" in d),
           {
             ...layoutBase,
             title: { text: "Plan  +N up  +E right", font: { size: 12 } },
-            xaxis: { title: "East", zeroline: true, scaleanchor: "y", scaleratio: 1 },
-            yaxis: { title: "North", zeroline: true },
+            xaxis: { title: `East ${unitLabel}`, zeroline: true, scaleanchor: "y", scaleratio: 1, range: focusBounds?.east },
+            yaxis: { title: `North ${unitLabel}`, zeroline: true, range: focusBounds?.north },
             annotations: [{ x: 0, y: 0, text: "N↑", showarrow: false, xanchor: "left" }],
           },
-          plotCfg
-        ).then(() => bindPlotEvents(node, seq, plotSeq.current, click))
-      );
+        );
     }
 
     if (tab === "profile") {
+      const sectionBounds = focusBounds ? focusBounds.north.flatMap((north) =>
+        focusBounds.east.map((east) => extraVs(north, east, vspDeg))) : null;
       const data = [
         ...plotPaths.flatMap((h) => holeProfileTraces(h)),
         ...projProfile(plotMeasured, plotProjected),
@@ -156,20 +197,35 @@ export function Charts({
             ? branchMark2d(targetVs(t, vspDeg), t.tvd, t.name || "Junction")
             : targetMark2d(targetVs(t, vspDeg), t.tvd, t.name || "Target")
         ),
+        ...visibleExtras.map((p) =>
+          extraLine2d(
+            p.points.map((q) => q.vs ?? extraVs(q.north, q.east, vspDeg)),
+            p.points.map((q) => q.tvd),
+            p
+          )
+        ),
+        ...targetOutlines.flatMap((o) => {
+          const pts = profileTargetMode === "intersection" ? o.section : o.projection;
+          return [
+            line2d(
+              pts.map((q) => q[0]),
+              pts.map((q) => q[1]),
+              `${o.name} ${profileTargetMode === "intersection" ? "section-plane intersection" : "orthogonal projection"}`,
+              "#c44b3c",
+              profileTargetMode === "intersection" ? "solid" : "dash"
+            ),
+          ];
+        }),
       ];
-      enqueuePlot(seq, () =>
-        Plotly.react(
-          node,
+        draw(
           data.filter((d) => d && "type" in d),
           {
             ...layoutBase,
             title: { text: "Profile  VS vs TVD (TVD down — view only)", font: { size: 12 } },
-            xaxis: { title: "Vertical section" },
-            yaxis: { title: "TVD", autorange: "reversed" },
+            xaxis: { title: `Vertical section ${unitLabel}`, range: sectionBounds ? [Math.min(...sectionBounds), Math.max(...sectionBounds)] : undefined },
+            yaxis: { title: `TVD ${unitLabel}`, autorange: focusBounds ? false : "reversed", range: focusBounds ? [...focusBounds.tvd].reverse() : undefined, scaleanchor: "x", scaleratio: 1 },
           },
-          plotCfg
-        ).then(() => bindPlotEvents(node, seq, plotSeq.current, click))
-      );
+        );
     }
 
     if (tab === "3d") {
@@ -188,48 +244,65 @@ export function Charts({
             }
           : {},
         ...targets.map((t) => targetMark3d(t, isJunctionTarget(t, targets))),
+        ...visibleExtras.map((p) => p.mesh ? ({
+          type: "mesh3d", name: p.name, color: p.color, opacity: p.opacity ?? 0.18,
+          x: p.mesh.vertices.map((q) => q[1]), y: p.mesh.vertices.map((q) => q[0]), z: p.mesh.vertices.map((q) => q[2]),
+          i: p.mesh.triangles.map((q) => q[0]), j: p.mesh.triangles.map((q) => q[1]), k: p.mesh.triangles.map((q) => q[2]),
+          hovertemplate: `${p.name}<extra></extra>`, flatshading: false,
+        }) : ({
+          type: "scatter3d",
+          mode: "lines",
+          x: p.points.map((q) => q.east),
+          y: p.points.map((q) => q.north),
+          z: p.points.map((q) => q.tvd),
+          name: p.name,
+          line: { color: p.color, width: p.width ?? 5, dash: p.dash ?? "dash" },
+          opacity: p.opacity ?? 1,
+        })),
+        ...targetOutlines.map((o) => ({
+          type: "scatter3d",
+          mode: "lines",
+          x: o.world.map((q) => q[1]),
+          y: o.world.map((q) => q[0]),
+          z: o.world.map((q) => q[2]),
+          name: `${o.name} footprint`,
+          line: { color: "#c44b3c", width: 4 },
+        })),
       ].filter(isScatter3d);
-      const aspect = sceneAspect(plotPaths, targets, plotSel);
+      const bounds = focusBounds ?? boundsFor3d(data);
+      const spans = { x: bounds.east[1]-bounds.east[0], y: bounds.north[1]-bounds.north[0], z: bounds.tvd[1]-bounds.tvd[0] };
+      const largest = Math.max(spans.x,spans.y,spans.z);
       const layout3d = {
         ...layoutBase,
         title: { text: "3-D  +N / +E / TVD down", font: { size: 12 } },
         scene: {
           domain: { x: [0, 1], y: [0, 1] },
-          xaxis: { title: "East", backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
-          yaxis: { title: "North", backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
-          zaxis: { title: "TVD", autorange: "reversed", backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
-          aspectmode: "manual" as const,
-          aspectratio: aspect,
+          xaxis: { title: `East ${unitLabel}`, range: bounds.east, autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
+          yaxis: { title: `North ${unitLabel}`, range: bounds.north, autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
+          zaxis: { title: `TVD ${unitLabel}`, range: [...bounds.tvd].reverse(), autorange: false, backgroundcolor: "#1b1d21", gridcolor: "#3a3e46" },
+          aspectmode: "manual",
+          camera: { eye: { x: 1.5, y: 1.5, z: 1.5 } },
+          aspectratio: {x:spans.x/largest,y:spans.y/largest,z:spans.z/largest},
+          uirevision: JSON.stringify(focusBounds ?? "overview"),
           bgcolor: "#1b1d21",
         },
       };
-      const draw = entering3d ? Plotly.newPlot : Plotly.react;
-      enqueuePlot(seq, () =>
-        draw(node, data, layout3d, plotCfg).then(() => bindPlotEvents(node, seq, plotSeq.current, click))
-      );
+      draw(data, layout3d);
     }
-  }, [tab, stations, overlays, selected, targets, vspDeg, currentHoleId]);
-
-  function enqueuePlot(seq: number, fn: () => Promise<unknown>) {
-    plotTail.current = plotTail.current
-      .catch(() => undefined)
-      .then(() => {
-        if (seq !== plotSeq.current) return;
-        return fn();
-      })
-      .then(() => undefined);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (el.current) Plotly.purge(el.current);
-    };
-  }, []);
+  }, [tab, stations, overlays, selected, targets, vspDeg, currentHoleId, extraPaths, targetOutlines, profileTargetMode, hiddenLayers, focusBounds, unitLabel]);
 
   if (tab === "target") return null;
   return (
     <div className="chart-pane">
+      {layers.length > 0 && <div className="chart-layers" role="group" aria-label="Preview layers">
+        <span>LAYERS</span>
+        {layers.map(([id, layer]) => <label key={id}>
+          <input type="checkbox" checked={!hiddenLayers.includes(id)} onChange={() => setHiddenLayers((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])} />
+          <i style={{ background: layer.color }} />{layer.label}
+        </label>)}
+      </div>}
       <ChartLegend items={legendItems} />
+      {error && <div className="chart-error" role="alert">{error} <button onClick={retry}>Retry preview</button></div>}
       <div className="chart" ref={el} />
     </div>
   );
@@ -289,11 +362,8 @@ function ChartLegend({ items }: { items: { color: string; label: string }[] }) {
 
 function bindPlotEvents(
   node: HTMLDivElement,
-  seq: number,
-  current: number,
   click: (ev: { points?: { customdata?: PickPoint }[] }) => void
 ) {
-  if (seq !== current) return;
   const n = node as unknown as {
     on: (e: string, fn: (ev?: unknown) => void) => void;
     removeAllListeners?: (e: string) => void;
@@ -324,54 +394,12 @@ function clampPlotlyHover(root: HTMLElement) {
 }
 
 function isScatter3d(d: object): boolean {
-  return "type" in d && (d as { type?: string }).type === "scatter3d";
+  return "type" in d && ["scatter3d", "mesh3d"].includes((d as { type: string }).type);
 }
 
 function isJunctionTarget(t: Target, all: Target[]): boolean {
   if (t.parent_target_id) return false;
   return /^junction$/i.test(t.name) || all.some((c) => c.parent_target_id === t.id);
-}
-
-function sceneAspect(
-  paths: HoleOverlay[],
-  targets: Target[],
-  sel: CalculatedStation | undefined
-): { x: number; y: number; z: number } {
-  const xs: number[] = [];
-  const ys: number[] = [];
-  const zs: number[] = [];
-  for (const h of paths) {
-    for (const s of h.stations) {
-      xs.push(s.east);
-      ys.push(s.north);
-      zs.push(s.tvd);
-    }
-  }
-  for (const t of targets) {
-    xs.push(t.east);
-    ys.push(t.north);
-    zs.push(t.tvd);
-  }
-  if (sel) {
-    xs.push(sel.east);
-    ys.push(sel.north);
-    zs.push(sel.tvd);
-  }
-  const span = (a: number[]) => {
-    if (a.length === 0) return 1;
-    const s = Math.max(...a) - Math.min(...a);
-    return s > 1e-6 ? s : 1;
-  };
-  const ex = span(xs);
-  const ey = span(ys);
-  const ez = span(zs);
-  const m = Math.max(ex, ey, ez, 1);
-  const floor = m * 0.18;
-  return {
-    x: Math.max(ex, floor) / m,
-    y: Math.max(ey, floor) / m,
-    z: Math.max(ez, floor) / m,
-  };
 }
 
 function measuredIndexed(h: HoleOverlay) {
@@ -492,9 +520,13 @@ function proj3d(measured: CalculatedStation[], projected: CalculatedStation[]) {
   ];
 }
 
-function targetVs(t: Target, vspDeg: number): number {
+function extraVs(north: number, east: number, vspDeg: number): number {
   const th = (vspDeg * Math.PI) / 180;
-  return t.north * Math.cos(th) + t.east * Math.sin(th);
+  return north * Math.cos(th) + east * Math.sin(th);
+}
+
+function targetVs(t: Target, vspDeg: number): number {
+  return extraVs(t.north, t.east, vspDeg);
 }
 
 function targetMark2d(x: number, y: number, name: string) {
@@ -541,6 +573,13 @@ function branchMark2d(x: number, y: number, name: string, pick?: PickPoint) {
       color: "#e0c36a",
       line: { width: 1, color: "#e0c36a" },
     },
+  };
+}
+
+function extraLine2d(x: number[], y: number[], p: ExtraPath) {
+  return { type: "scatter", mode: "lines", x, y, name: p.name,
+    line: { color: p.color, width: p.width ?? 2.5, dash: p.dash ?? "dash" },
+    opacity: p.opacity ?? 1, fill: p.fill ? "toself" : undefined,
   };
 }
 

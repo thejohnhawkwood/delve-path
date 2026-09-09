@@ -1,10 +1,17 @@
 import type { Target } from "../../domain";
-import type { HoleRecord, ProjectRecord, StationRecord } from "../../records";
+import {
+  defaultHoleFrame,
+  defaultStationReview,
+  type DocumentRecord,
+  type HoleRecord,
+  type ProjectRecord,
+  type StationRecord,
+} from "../../records";
 import { buildSnapshot, parseSnapshot } from "../snapshot";
 import type { BrowserProjectSnapshot, ProjectRepository, ProjectSummary } from "../types";
 
 export const IDB_NAME = "delvepath";
-export const IDB_SCHEMA_VERSION = 1;
+export const IDB_SCHEMA_VERSION = 2;
 
 type MetaRow = { key: string; value: string };
 
@@ -23,6 +30,14 @@ function txDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
+function normalizeHole(h: HoleRecord): HoleRecord {
+  return { ...defaultHoleFrame(), ...h };
+}
+
+function normalizeStation(s: StationRecord): StationRecord {
+  return { ...defaultStationReview(), ...s };
+}
+
 export function openDelveDb(indexedDBImpl: IDBFactory = indexedDB): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const open = indexedDBImpl.open(IDB_NAME, IDB_SCHEMA_VERSION);
@@ -39,11 +54,18 @@ export function openDelveDb(indexedDBImpl: IDBFactory = indexedDB): Promise<IDBD
         targets.createIndex("hole_id", "hole_id");
         db.createObjectStore("meta", { keyPath: "key" });
       }
+      if (from < 2) {
+        const docs = db.createObjectStore("documents", { keyPath: "id" });
+        docs.createIndex("hole_id", "hole_id");
+        docs.createIndex("kind", "kind");
+      }
     };
     open.onsuccess = () => resolve(open.result);
     open.onerror = () => reject(open.error ?? new Error("Failed to open DelvePath IndexedDB"));
   });
 }
+
+const ALL_STORES = ["projects", "holes", "stations", "targets", "documents", "meta"] as const;
 
 export function createBrowserRepository(
   db: IDBDatabase,
@@ -111,15 +133,18 @@ export function createBrowserRepository(
       const holes = await byIndex<HoleRecord>("holes", "project_id", id);
       const stationIds: string[] = [];
       const targetIds: string[] = [];
+      const docIds: string[] = [];
       for (const h of holes) {
         stationIds.push(...(await byIndex<StationRecord>("stations", "hole_id", h.id)).map((s) => s.id));
         targetIds.push(...(await byIndex<Target>("targets", "hole_id", h.id)).map((t) => t.id));
+        docIds.push(...(await byIndex<DocumentRecord>("documents", "hole_id", h.id)).map((d) => d.id));
       }
       const last = await this.getLastOpenedId();
-      const tx = db.transaction(["projects", "holes", "stations", "targets", "meta"], "readwrite");
+      const tx = db.transaction([...ALL_STORES], "readwrite");
       tx.objectStore("projects").delete(id);
       for (const sid of stationIds) tx.objectStore("stations").delete(sid);
       for (const tid of targetIds) tx.objectStore("targets").delete(tid);
+      for (const did of docIds) tx.objectStore("documents").delete(did);
       for (const h of holes) tx.objectStore("holes").delete(h.id);
       if (last === id) tx.objectStore("meta").delete("lastOpenedId");
       await txDone(tx);
@@ -140,7 +165,7 @@ export function createBrowserRepository(
 
     async saveHole(hole) {
       const tx = db.transaction(["holes", "projects"], "readwrite");
-      tx.objectStore("holes").put(hole);
+      tx.objectStore("holes").put(normalizeHole(hole));
       const project = (await req(tx.objectStore("projects").get(hole.project_id))) as
         | (ProjectRecord & { updatedAt?: string })
         | undefined;
@@ -155,12 +180,12 @@ export function createBrowserRepository(
       const existing = await byIndex<StationRecord>("stations", "hole_id", holeId);
       const tx = db.transaction("stations", "readwrite");
       for (const s of existing) tx.objectStore("stations").delete(s.id);
-      for (const s of stations) tx.objectStore("stations").put({ ...s, hole_id: holeId });
+      for (const s of stations) tx.objectStore("stations").put(normalizeStation({ ...s, hole_id: holeId }));
       await txDone(tx);
     },
 
     async loadStations(holeId) {
-      const rows = await byIndex<StationRecord>("stations", "hole_id", holeId);
+      const rows = (await byIndex<StationRecord>("stations", "hole_id", holeId)).map(normalizeStation);
       return rows.sort((a, b) => a.seq - b.seq);
     },
 
@@ -175,7 +200,7 @@ export function createBrowserRepository(
     },
 
     async listHoles(projectId) {
-      return byIndex<HoleRecord>("holes", "project_id", projectId);
+      return (await byIndex<HoleRecord>("holes", "project_id", projectId)).map(normalizeHole);
     },
 
     async deleteTarget(targetId) {
@@ -197,10 +222,29 @@ export function createBrowserRepository(
       }
       const stations = await byIndex<StationRecord>("stations", "hole_id", holeId);
       const targets = await byIndex<Target>("targets", "hole_id", holeId);
-      const tx = db.transaction(["holes", "stations", "targets"], "readwrite");
+      const docs = await byIndex<DocumentRecord>("documents", "hole_id", holeId);
+      const tx = db.transaction(["holes", "stations", "targets", "documents"], "readwrite");
       for (const s of stations) tx.objectStore("stations").delete(s.id);
       for (const t of targets) tx.objectStore("targets").delete(t.id);
+      for (const d of docs) tx.objectStore("documents").delete(d.id);
       tx.objectStore("holes").delete(holeId);
+      await txDone(tx);
+    },
+
+    async saveDocument(doc) {
+      const tx = db.transaction("documents", "readwrite");
+      tx.objectStore("documents").put({ ...doc, updated_at: doc.updated_at || new Date().toISOString() });
+      await txDone(tx);
+    },
+
+    async loadDocuments(holeId, kind) {
+      const rows = await byIndex<DocumentRecord>("documents", "hole_id", holeId);
+      return kind ? rows.filter((d) => d.kind === kind) : rows;
+    },
+
+    async deleteDocument(id) {
+      const tx = db.transaction("documents", "readwrite");
+      tx.objectStore("documents").delete(id);
       await txDone(tx);
     },
 
@@ -209,14 +253,16 @@ export function createBrowserRepository(
         db.transaction("projects", "readonly").objectStore("projects").get(projectId)
       )) as ProjectRecord | undefined;
       if (!project) throw new Error("Project not found.");
-      const holes = await byIndex<HoleRecord>("holes", "project_id", projectId);
+      const holes = (await byIndex<HoleRecord>("holes", "project_id", projectId)).map(normalizeHole);
       const stations: StationRecord[] = [];
       const targets: Target[] = [];
+      const documents: DocumentRecord[] = [];
       for (const h of holes) {
-        stations.push(...(await byIndex<StationRecord>("stations", "hole_id", h.id)));
+        stations.push(...(await byIndex<StationRecord>("stations", "hole_id", h.id)).map(normalizeStation));
         targets.push(...(await byIndex<Target>("targets", "hole_id", h.id)));
+        documents.push(...(await byIndex<DocumentRecord>("documents", "hole_id", h.id)));
       }
-      return buildSnapshot({ project, holes, stations, targets, applicationVersion });
+      return buildSnapshot({ project, holes, stations, targets, documents, applicationVersion });
     },
 
     async importSnapshot(data: unknown) {
@@ -234,39 +280,50 @@ export function createBrowserRepository(
         id: nextId(snap.project.id),
         updatedAt: new Date().toISOString(),
       };
-      const holes = snap.holes.map((h) => ({
-        ...h,
-        id: nextId(h.id),
-        project_id: project.id,
-        parent_hole_id: h.parent_hole_id ? nextId(h.parent_hole_id) : null,
-      }));
-      const stations = snap.stations.map((s) => ({
-        ...s,
-        id: nextId(s.id),
-        hole_id: nextId(s.hole_id),
-      }));
+      const holes = snap.holes.map((h) =>
+        normalizeHole({
+          ...h,
+          id: nextId(h.id),
+          project_id: project.id,
+          parent_hole_id: h.parent_hole_id ? nextId(h.parent_hole_id) : null,
+        })
+      );
+      const stations = snap.stations.map((s) =>
+        normalizeStation({
+          ...s,
+          id: nextId(s.id),
+          hole_id: nextId(s.hole_id),
+        })
+      );
       const targets = snap.targets.map((t) => ({
         ...t,
         id: nextId(t.id),
         hole_id: nextId(t.hole_id),
         parent_target_id: t.parent_target_id ? nextId(t.parent_target_id) : null,
       }));
-      const tx = db.transaction(["projects", "holes", "stations", "targets", "meta"], "readwrite");
+      const documents = snap.documents.map((d) => ({
+        ...d,
+        id: nextId(d.id),
+        hole_id: nextId(d.hole_id),
+      }));
+      const tx = db.transaction([...ALL_STORES], "readwrite");
       tx.objectStore("projects").put(project);
       for (const h of holes) tx.objectStore("holes").put(h);
       for (const s of stations) tx.objectStore("stations").put(s);
       for (const t of targets) tx.objectStore("targets").put(t);
+      for (const d of documents) tx.objectStore("documents").put(d);
       tx.objectStore("meta").put({ key: "lastOpenedId", value: project.id } satisfies MetaRow);
       await txDone(tx);
       return project;
     },
 
     async resetAll() {
-      const tx = db.transaction(["projects", "holes", "stations", "targets", "meta"], "readwrite");
+      const tx = db.transaction([...ALL_STORES], "readwrite");
       tx.objectStore("projects").clear();
       tx.objectStore("holes").clear();
       tx.objectStore("stations").clear();
       tx.objectStore("targets").clear();
+      tx.objectStore("documents").clear();
       tx.objectStore("meta").clear();
       await txDone(tx);
     },
@@ -304,6 +361,11 @@ export function remapSnapshotIds(
       id: nextId(t.id),
       hole_id: nextId(t.hole_id),
       parent_target_id: t.parent_target_id ? nextId(t.parent_target_id) : null,
+    })),
+    documents: snap.documents.map((d) => ({
+      ...d,
+      id: nextId(d.id),
+      hole_id: nextId(d.hole_id),
     })),
   };
 }

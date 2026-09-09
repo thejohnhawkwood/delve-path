@@ -1,6 +1,6 @@
 [package]
 name = "delve-wasm"
-version = "0.1.1"
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 description = "Browser WebAssembly bindings for delve-core. No Tauri, IndexedDB, or UI."
@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 delve-core.workspace = true
+delve-engine.workspace = true
 serde.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

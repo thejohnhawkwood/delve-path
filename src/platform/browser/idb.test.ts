@@ -1,6 +1,7 @@
 import { indexedDB, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseSnapshot } from "../snapshot";
+import { defaultHoleFrame, defaultStationReview } from "../../records";
 import { createBrowserRepository, IDB_NAME, openDelveDb } from "./idb";
 
 Object.defineProperty(globalThis, "indexedDB", { value: indexedDB, configurable: true });
@@ -49,6 +50,7 @@ describe("IndexedDB repository", () => {
       parent_hole_id: null,
       branch_md: null,
       color: "#8ec8c8",
+      ...defaultHoleFrame(),
     };
     const lat = {
       ...parent,
@@ -74,6 +76,7 @@ describe("IndexedDB repository", () => {
         tvd_tie: 0,
         north_tie: 0,
         east_tie: 0,
+        ...defaultStationReview(),
       },
     ]);
     await r.saveTarget({
@@ -115,6 +118,7 @@ describe("IndexedDB repository", () => {
       parent_hole_id: null,
       branch_md: null,
       color: null,
+      ...defaultHoleFrame(),
     });
     const snap = await r.exportSnapshot(p.id);
     expect(() => parseSnapshot({ format: "bad" })).toThrow();
@@ -127,11 +131,46 @@ describe("IndexedDB repository", () => {
     db.close();
   });
 
-  it("sets schema version 1 on first open", async () => {
+  it("round-trips a document on schema v2", async () => {
+    const { db, r } = await repo();
+    const p = await r.create({ name: "Docs", client: "" });
+    const hole = {
+      id: newId(),
+      project_id: p.id,
+      name: "H1",
+      unit_system: "imperial",
+      survey_convention: "oilfield_from_vertical",
+      azimuth_reference: "grid",
+      vsp_deg: 45,
+      declination_note: "",
+      grid_note: "",
+      parent_hole_id: null,
+      branch_md: null,
+      color: null,
+      ...defaultHoleFrame(),
+    };
+    await r.saveHole(hole);
+    await r.saveDocument({
+      id: `${hole.id}:plan`,
+      hole_id: hole.id,
+      kind: "plan",
+      payload: "{\"name\":\"demo\"}",
+      updated_at: "2026-08-28T00:00:00Z",
+    });
+    const docs = await r.loadDocuments(hole.id, "plan");
+    expect(docs).toHaveLength(1);
+    expect(docs[0].payload).toContain("demo");
+    const snap = await r.exportSnapshot(p.id);
+    expect(snap.formatVersion).toBe(2);
+    expect(snap.documents).toHaveLength(1);
+    db.close();
+  });
+
+  it("sets schema version 2 on first open", async () => {
     const db = await openDelveDb(indexedDB);
-    expect(db.version).toBe(1);
+    expect(db.version).toBe(2);
     expect([...db.objectStoreNames]).toEqual(
-      expect.arrayContaining(["projects", "holes", "stations", "targets", "meta"])
+      expect.arrayContaining(["projects", "holes", "stations", "targets", "documents", "meta"])
     );
     db.close();
   });

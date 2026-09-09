@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultHoleFrame, defaultStationReview } from "../records";
 import { buildSnapshot, parseSnapshot, SnapshotError } from "./snapshot";
 
 const good = buildSnapshot({
@@ -18,6 +19,7 @@ const good = buildSnapshot({
       parent_hole_id: null,
       branch_md: null,
       color: "#8ec8c8",
+      ...defaultHoleFrame(),
     },
   ],
   stations: [
@@ -34,6 +36,7 @@ const good = buildSnapshot({
       tvd_tie: 0,
       north_tie: 0,
       east_tie: 0,
+      ...defaultStationReview(),
     },
   ],
   targets: [
@@ -49,6 +52,7 @@ const good = buildSnapshot({
       parent_target_id: null,
     },
   ],
+  documents: [],
 });
 
 describe("browser snapshot", () => {
@@ -64,6 +68,16 @@ describe("browser snapshot", () => {
     expect(() => parseSnapshot({ format: "nope" })).toThrow(SnapshotError);
     expect(() => parseSnapshot(null)).toThrow(SnapshotError);
     expect(() => parseSnapshot({ ...good, stations: [{ md: "x" }] })).toThrow(SnapshotError);
+  });
+
+  it("migrates a v1 snapshot to v2 without rejecting it", () => {
+    const { documents: _docs, ...rest } = good;
+    const v1 = { ...rest, formatVersion: 1 };
+    const parsed = parseSnapshot(v1);
+    expect(parsed.formatVersion).toBe(2);
+    expect(parsed.stations[0].review_state).toBe("unreviewed");
+    expect(parsed.holes[0].origin_id).toBe("unspecified");
+    expect(parsed.documents).toEqual([]);
   });
 
   it("rejects a hole from another project", () => {

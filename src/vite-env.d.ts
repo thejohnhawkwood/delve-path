@@ -2,6 +2,7 @@
 
 declare const __DELVE_VERSION__: string;
 declare const __DELVE_GIT_SHA__: string;
+declare const __DELVE_SOURCE_SHA256__: string;
 
 interface ImportMetaEnv {
   readonly VITE_DESKTOP_DOWNLOAD_URL?: string;

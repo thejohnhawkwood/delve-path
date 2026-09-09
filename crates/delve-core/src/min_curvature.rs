@@ -5,55 +5,13 @@
 //! standard algebraic form of that circular arc.
 //! See docs/CALCULATION_SPEC.md.
 
+use crate::geom::{closure, dogleg_and_rf, unit_tangent, vertical_section};
 use crate::types::{CalculatedStation, HoleCalcInput, MeasuredStation, StationClass, Trajectory};
 use crate::units::{
     deg_to_rad, dls_to_display, ft_to_m, m_to_ft, rad_to_deg, DlsDisplay, UnitSystem,
 };
 use crate::validate::{has_blocking_error, validate_stations};
 use crate::CalcError;
-
-/// β below this (radians) uses RF = 1 (limit of 2/β tan(β/2)).
-pub const SMALL_BETA_RAD: f64 = 1e-12;
-
-#[derive(Debug, Clone, Copy)]
-struct Vec3 {
-    n: f64,
-    e: f64,
-    t: f64,
-}
-
-fn unit_tangent(inc_rad: f64, azi_rad: f64) -> Vec3 {
-    let s = inc_rad.sin();
-    Vec3 {
-        n: s * azi_rad.cos(),
-        e: s * azi_rad.sin(),
-        t: inc_rad.cos(),
-    }
-}
-
-fn dogleg_and_rf(v1: Vec3, v2: Vec3) -> (f64, f64) {
-    let cos_b = (v1.n * v2.n + v1.e * v2.e + v1.t * v2.t).clamp(-1.0, 1.0);
-    let beta = cos_b.acos();
-    let rf = if beta < SMALL_BETA_RAD {
-        1.0
-    } else {
-        (2.0 / beta) * (beta / 2.0).tan()
-    };
-    (beta, rf)
-}
-
-fn vertical_section(north: f64, east: f64, vsp_rad: f64) -> f64 {
-    north * vsp_rad.cos() + east * vsp_rad.sin()
-}
-
-fn closure(north: f64, east: f64) -> (f64, f64) {
-    let dist = north.hypot(east);
-    let mut azi = east.atan2(north);
-    if azi < 0.0 {
-        azi += std::f64::consts::TAU;
-    }
-    (dist, azi)
-}
 
 /// Reconstruct a trajectory. Lengths in the hole `unit_system`.
 pub fn calculate_trajectory(input: &HoleCalcInput) -> Result<Trajectory, CalcError> {

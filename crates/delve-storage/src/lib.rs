@@ -40,6 +40,28 @@ pub struct HoleRecord {
     /// Optional plot/table color (`#rrggbb`). Null = UI default (parent then lateral palette).
     #[serde(default)]
     pub color: Option<String>,
+    #[serde(default = "default_origin_id")]
+    pub origin_id: String,
+    #[serde(default)]
+    pub origin_north: f64,
+    #[serde(default)]
+    pub origin_east: f64,
+    #[serde(default = "default_vertical_datum")]
+    pub vertical_datum: String,
+    #[serde(default)]
+    pub vertical_datum_name: String,
+    #[serde(default)]
+    pub crs_epsg: Option<i32>,
+    #[serde(default)]
+    pub crs_note: String,
+}
+
+fn default_origin_id() -> String {
+    "unspecified".into()
+}
+
+fn default_vertical_datum() -> String {
+    "unspecified".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +78,20 @@ pub struct StationRecord {
     pub tvd_tie: Option<f64>,
     pub north_tie: Option<f64>,
     pub east_tie: Option<f64>,
+    #[serde(default = "default_review_state")]
+    pub review_state: String,
+    #[serde(default)]
+    pub reviewer: String,
+    #[serde(default)]
+    pub review_source: String,
+    #[serde(default)]
+    pub reviewed_at: Option<String>,
+    #[serde(default)]
+    pub exclusion_reason: String,
+}
+
+fn default_review_state() -> String {
+    "unreviewed".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +107,20 @@ pub struct TargetRecord {
     /// None = junction / standalone. Some = child of that junction.
     #[serde(default)]
     pub parent_target_id: Option<String>,
+    /// Versioned target-plane + footprint JSON. None = legacy point (horizontal plane).
+    #[serde(default)]
+    pub geometry_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DocumentRecord {
+    pub id: String,
+    pub hole_id: String,
+    /// plan | bha | segment | decision | datum | wireline | marker | covariance | scan
+    pub kind: String,
+    pub payload: String,
+    #[serde(default)]
+    pub updated_at: String,
 }
 
 pub struct Store {
@@ -159,6 +209,7 @@ impl Store {
         self.migrate_holes_branch_columns()?;
         self.migrate_targets_parent_column()?;
         self.migrate_holes_color_column()?;
+        self.migrate_v5_frame_review_documents()?;
         Ok(())
     }
 
@@ -232,6 +283,97 @@ impl Store {
         Ok(())
     }
 
+    fn migrate_v5_frame_review_documents(&self) -> Result<(), StorageError> {
+        let hcols = self.table_columns("holes")?;
+        for (col, sql) in [
+            (
+                "origin_id",
+                "ALTER TABLE holes ADD COLUMN origin_id TEXT NOT NULL DEFAULT 'unspecified'",
+            ),
+            (
+                "origin_north",
+                "ALTER TABLE holes ADD COLUMN origin_north REAL NOT NULL DEFAULT 0",
+            ),
+            (
+                "origin_east",
+                "ALTER TABLE holes ADD COLUMN origin_east REAL NOT NULL DEFAULT 0",
+            ),
+            (
+                "vertical_datum",
+                "ALTER TABLE holes ADD COLUMN vertical_datum TEXT NOT NULL DEFAULT 'unspecified'",
+            ),
+            (
+                "vertical_datum_name",
+                "ALTER TABLE holes ADD COLUMN vertical_datum_name TEXT NOT NULL DEFAULT ''",
+            ),
+            ("crs_epsg", "ALTER TABLE holes ADD COLUMN crs_epsg INTEGER"),
+            (
+                "crs_note",
+                "ALTER TABLE holes ADD COLUMN crs_note TEXT NOT NULL DEFAULT ''",
+            ),
+        ] {
+            if !hcols.iter().any(|c| c == col) {
+                self.conn.execute(sql, [])?;
+            }
+        }
+        let scols = self.table_columns("stations")?;
+        for (col, sql) in [
+            (
+                "review_state",
+                "ALTER TABLE stations ADD COLUMN review_state TEXT NOT NULL DEFAULT 'unreviewed'",
+            ),
+            (
+                "reviewer",
+                "ALTER TABLE stations ADD COLUMN reviewer TEXT NOT NULL DEFAULT ''",
+            ),
+            (
+                "review_source",
+                "ALTER TABLE stations ADD COLUMN review_source TEXT NOT NULL DEFAULT ''",
+            ),
+            (
+                "reviewed_at",
+                "ALTER TABLE stations ADD COLUMN reviewed_at TEXT",
+            ),
+            (
+                "exclusion_reason",
+                "ALTER TABLE stations ADD COLUMN exclusion_reason TEXT NOT NULL DEFAULT ''",
+            ),
+        ] {
+            if !scols.iter().any(|c| c == col) {
+                self.conn.execute(sql, [])?;
+            }
+        }
+        let tcols = self.table_columns("targets")?;
+        if !tcols.iter().any(|c| c == "geometry_json") {
+            self.conn
+                .execute("ALTER TABLE targets ADD COLUMN geometry_json TEXT", [])?;
+        }
+        self.conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS documents (
+                id TEXT PRIMARY KEY,
+                hole_id TEXT NOT NULL REFERENCES holes(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS documents_hole_kind ON documents(hole_id, kind);
+            "#,
+        )?;
+        let version: i64 = self.conn.query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+            [],
+            |r| r.get(0),
+        )?;
+        if version < 5 {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (5)",
+                [],
+            )?;
+        }
+        Ok(())
+    }
+
     fn hole_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<HoleRecord> {
         Ok(HoleRecord {
             id: r.get(0)?,
@@ -246,6 +388,17 @@ impl Store {
             parent_hole_id: r.get(9)?,
             branch_md: r.get(10)?,
             color: r.get(11)?,
+            origin_id: r
+                .get::<_, Option<String>>(12)?
+                .unwrap_or_else(default_origin_id),
+            origin_north: r.get::<_, Option<f64>>(13)?.unwrap_or(0.0),
+            origin_east: r.get::<_, Option<f64>>(14)?.unwrap_or(0.0),
+            vertical_datum: r
+                .get::<_, Option<String>>(15)?
+                .unwrap_or_else(default_vertical_datum),
+            vertical_datum_name: r.get::<_, Option<String>>(16)?.unwrap_or_default(),
+            crs_epsg: r.get(17)?,
+            crs_note: r.get::<_, Option<String>>(18)?.unwrap_or_default(),
         })
     }
 
@@ -294,21 +447,23 @@ impl Store {
             .map_err(Into::into)
     }
 
+    const HOLE_COLS: &'static str = "id, project_id, name, unit_system, survey_convention, azimuth_reference, vsp_deg, declination_note, grid_note, parent_hole_id, branch_md, color, origin_id, origin_north, origin_east, vertical_datum, vertical_datum_name, crs_epsg, crs_note";
+
     pub fn upsert_hole(&self, h: &HoleRecord) -> Result<(), StorageError> {
         self.conn.execute(
-            "INSERT INTO holes (id, project_id, name, unit_system, survey_convention, azimuth_reference, vsp_deg, declination_note, grid_note, parent_hole_id, branch_md, color)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
-             ON CONFLICT(id) DO UPDATE SET name=?3, unit_system=?4, survey_convention=?5, azimuth_reference=?6, vsp_deg=?7, declination_note=?8, grid_note=?9, parent_hole_id=?10, branch_md=?11, color=?12, updated_at=datetime('now')",
-            params![h.id, h.project_id, h.name, h.unit_system, h.survey_convention, h.azimuth_reference, h.vsp_deg, h.declination_note, h.grid_note, h.parent_hole_id, h.branch_md, h.color],
+            "INSERT INTO holes (id, project_id, name, unit_system, survey_convention, azimuth_reference, vsp_deg, declination_note, grid_note, parent_hole_id, branch_md, color, origin_id, origin_north, origin_east, vertical_datum, vertical_datum_name, crs_epsg, crs_note)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+             ON CONFLICT(id) DO UPDATE SET name=?3, unit_system=?4, survey_convention=?5, azimuth_reference=?6, vsp_deg=?7, declination_note=?8, grid_note=?9, parent_hole_id=?10, branch_md=?11, color=?12, origin_id=?13, origin_north=?14, origin_east=?15, vertical_datum=?16, vertical_datum_name=?17, crs_epsg=?18, crs_note=?19, updated_at=datetime('now')",
+            params![h.id, h.project_id, h.name, h.unit_system, h.survey_convention, h.azimuth_reference, h.vsp_deg, h.declination_note, h.grid_note, h.parent_hole_id, h.branch_md, h.color, h.origin_id, h.origin_north, h.origin_east, h.vertical_datum, h.vertical_datum_name, h.crs_epsg, h.crs_note],
         )?;
         Ok(())
     }
 
     pub fn list_holes(&self, project_id: &str) -> Result<Vec<HoleRecord>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, project_id, name, unit_system, survey_convention, azimuth_reference, vsp_deg, declination_note, grid_note, parent_hole_id, branch_md, color
-             FROM holes WHERE project_id=?1 ORDER BY created_at",
-        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {} FROM holes WHERE project_id=?1 ORDER BY created_at",
+            Self::HOLE_COLS
+        ))?;
         let rows = stmt.query_map([project_id], Self::hole_from_row)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
@@ -316,7 +471,7 @@ impl Store {
     pub fn get_hole(&self, id: &str) -> Result<Option<HoleRecord>, StorageError> {
         self.conn
             .query_row(
-                "SELECT id, project_id, name, unit_system, survey_convention, azimuth_reference, vsp_deg, declination_note, grid_note, parent_hole_id, branch_md, color FROM holes WHERE id=?1",
+                &format!("SELECT {} FROM holes WHERE id=?1", Self::HOLE_COLS),
                 [id],
                 Self::hole_from_row,
             )
@@ -348,9 +503,9 @@ impl Store {
         tx.execute("DELETE FROM stations WHERE hole_id=?1", [hole_id])?;
         for s in stations {
             tx.execute(
-                "INSERT INTO stations (id, hole_id, seq, md, inc_deg, azi_deg, comment, source, class, tvd_tie, north_tie, east_tie)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
-                params![s.id, s.hole_id, s.seq, s.md, s.inc_deg, s.azi_deg, s.comment, s.source, s.class, s.tvd_tie, s.north_tie, s.east_tie],
+                "INSERT INTO stations (id, hole_id, seq, md, inc_deg, azi_deg, comment, source, class, tvd_tie, north_tie, east_tie, review_state, reviewer, review_source, reviewed_at, exclusion_reason)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+                params![s.id, s.hole_id, s.seq, s.md, s.inc_deg, s.azi_deg, s.comment, s.source, s.class, s.tvd_tie, s.north_tie, s.east_tie, s.review_state, s.reviewer, s.review_source, s.reviewed_at, s.exclusion_reason],
             )?;
         }
         tx.commit()?;
@@ -359,7 +514,7 @@ impl Store {
 
     pub fn list_stations(&self, hole_id: &str) -> Result<Vec<StationRecord>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, hole_id, seq, md, inc_deg, azi_deg, comment, source, class, tvd_tie, north_tie, east_tie
+            "SELECT id, hole_id, seq, md, inc_deg, azi_deg, comment, source, class, tvd_tie, north_tie, east_tie, review_state, reviewer, review_source, reviewed_at, exclusion_reason
              FROM stations WHERE hole_id=?1 ORDER BY seq",
         )?;
         let rows = stmt.query_map([hole_id], |r| {
@@ -376,6 +531,13 @@ impl Store {
                 tvd_tie: r.get(9)?,
                 north_tie: r.get(10)?,
                 east_tie: r.get(11)?,
+                review_state: r
+                    .get::<_, Option<String>>(12)?
+                    .unwrap_or_else(default_review_state),
+                reviewer: r.get::<_, Option<String>>(13)?.unwrap_or_default(),
+                review_source: r.get::<_, Option<String>>(14)?.unwrap_or_default(),
+                reviewed_at: r.get(15)?,
+                exclusion_reason: r.get::<_, Option<String>>(16)?.unwrap_or_default(),
             })
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
@@ -383,17 +545,17 @@ impl Store {
 
     pub fn upsert_target(&self, t: &TargetRecord) -> Result<(), StorageError> {
         self.conn.execute(
-            "INSERT INTO targets (id, hole_id, name, north, east, tvd, horiz_tol, vert_tol, parent_target_id)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
-             ON CONFLICT(id) DO UPDATE SET name=?3, north=?4, east=?5, tvd=?6, horiz_tol=?7, vert_tol=?8, parent_target_id=?9, hole_id=?2, updated_at=datetime('now')",
-            params![t.id, t.hole_id, t.name, t.north, t.east, t.tvd, t.horiz_tol, t.vert_tol, t.parent_target_id],
+            "INSERT INTO targets (id, hole_id, name, north, east, tvd, horiz_tol, vert_tol, parent_target_id, geometry_json)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+             ON CONFLICT(id) DO UPDATE SET name=?3, north=?4, east=?5, tvd=?6, horiz_tol=?7, vert_tol=?8, parent_target_id=?9, hole_id=?2, geometry_json=?10, updated_at=datetime('now')",
+            params![t.id, t.hole_id, t.name, t.north, t.east, t.tvd, t.horiz_tol, t.vert_tol, t.parent_target_id, t.geometry_json],
         )?;
         Ok(())
     }
 
     pub fn list_targets(&self, hole_id: &str) -> Result<Vec<TargetRecord>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, hole_id, name, north, east, tvd, horiz_tol, vert_tol, parent_target_id FROM targets WHERE hole_id=?1",
+            "SELECT id, hole_id, name, north, east, tvd, horiz_tol, vert_tol, parent_target_id, geometry_json FROM targets WHERE hole_id=?1",
         )?;
         let rows = stmt.query_map([hole_id], |r| {
             Ok(TargetRecord {
@@ -406,6 +568,7 @@ impl Store {
                 horiz_tol: r.get(6)?,
                 vert_tol: r.get(7)?,
                 parent_target_id: r.get(8)?,
+                geometry_json: r.get(9)?,
             })
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
@@ -420,6 +583,52 @@ impl Store {
         self.conn.execute("DELETE FROM targets WHERE id=?1", [id])?;
         Ok(())
     }
+
+    pub fn upsert_document(&self, d: &DocumentRecord) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO documents (id, hole_id, kind, payload)
+             VALUES (?1,?2,?3,?4)
+             ON CONFLICT(id) DO UPDATE SET hole_id=?2, kind=?3, payload=?4, updated_at=datetime('now')",
+            params![d.id, d.hole_id, d.kind, d.payload],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_documents(
+        &self,
+        hole_id: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<DocumentRecord>, StorageError> {
+        if let Some(k) = kind {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, hole_id, kind, payload, updated_at FROM documents WHERE hole_id=?1 AND kind=?2 ORDER BY updated_at",
+            )?;
+            let rows = stmt.query_map(params![hole_id, k], Self::document_from_row)?;
+            Ok(rows.collect::<Result<Vec<_>, _>>()?)
+        } else {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, hole_id, kind, payload, updated_at FROM documents WHERE hole_id=?1 ORDER BY kind, updated_at",
+            )?;
+            let rows = stmt.query_map([hole_id], Self::document_from_row)?;
+            Ok(rows.collect::<Result<Vec<_>, _>>()?)
+        }
+    }
+
+    pub fn delete_document(&self, id: &str) -> Result<(), StorageError> {
+        self.conn
+            .execute("DELETE FROM documents WHERE id=?1", [id])?;
+        Ok(())
+    }
+
+    fn document_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<DocumentRecord> {
+        Ok(DocumentRecord {
+            id: r.get(0)?,
+            hole_id: r.get(1)?,
+            kind: r.get(2)?,
+            payload: r.get(3)?,
+            updated_at: r.get(4)?,
+        })
+    }
 }
 
 pub fn new_id() -> String {
@@ -429,6 +638,52 @@ pub fn new_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hole(id: String, project_id: String, name: &str) -> HoleRecord {
+        HoleRecord {
+            id,
+            project_id,
+            name: name.into(),
+            unit_system: "imperial".into(),
+            survey_convention: "oilfield_from_vertical".into(),
+            azimuth_reference: "unknown".into(),
+            vsp_deg: 90.0,
+            declination_note: "".into(),
+            grid_note: "".into(),
+            parent_hole_id: None,
+            branch_md: None,
+            color: None,
+            origin_id: "unspecified".into(),
+            origin_north: 0.0,
+            origin_east: 0.0,
+            vertical_datum: "unspecified".into(),
+            vertical_datum_name: "".into(),
+            crs_epsg: None,
+            crs_note: "".into(),
+        }
+    }
+
+    fn station(id: String, hole_id: String) -> StationRecord {
+        StationRecord {
+            id,
+            hole_id,
+            seq: 0,
+            md: 0.0,
+            inc_deg: 0.0,
+            azi_deg: 0.0,
+            comment: "".into(),
+            source: "manual".into(),
+            class: "measured".into(),
+            tvd_tie: None,
+            north_tie: None,
+            east_tie: None,
+            review_state: "unreviewed".into(),
+            reviewer: "".into(),
+            review_source: "".into(),
+            reviewed_at: None,
+            exclusion_reason: "".into(),
+        }
+    }
 
     #[test]
     fn save_reopen_stations() {
@@ -440,35 +695,16 @@ mod tests {
             notes: "".into(),
         };
         db.upsert_project(&p).unwrap();
-        let h = HoleRecord {
-            id: new_id(),
-            project_id: p.id.clone(),
-            name: "H1".into(),
-            unit_system: "imperial".into(),
-            survey_convention: "oilfield_from_vertical".into(),
-            azimuth_reference: "unknown".into(),
-            vsp_deg: 165.3,
-            declination_note: "".into(),
-            grid_note: "".into(),
-            parent_hole_id: None,
-            branch_md: None,
-            color: None,
-        };
+        let mut h = hole(new_id(), p.id.clone(), "H1");
+        h.vsp_deg = 165.3;
         db.upsert_hole(&h).unwrap();
-        let s = StationRecord {
-            id: new_id(),
-            hole_id: h.id.clone(),
-            seq: 0,
-            md: 445.0,
-            inc_deg: 0.0,
-            azi_deg: 0.0,
-            comment: "tie".into(),
-            source: "tie_in".into(),
-            class: "measured".into(),
-            tvd_tie: Some(445.0),
-            north_tie: Some(0.0),
-            east_tie: Some(0.0),
-        };
+        let mut s = station(new_id(), h.id.clone());
+        s.md = 445.0;
+        s.comment = "tie".into();
+        s.source = "tie_in".into();
+        s.tvd_tie = Some(445.0);
+        s.north_tie = Some(0.0);
+        s.east_tie = Some(0.0);
         db.replace_stations(&h.id, std::slice::from_ref(&s))
             .unwrap();
         let back = db.list_stations(&h.id).unwrap();
@@ -490,35 +726,11 @@ mod tests {
             notes: "".into(),
         };
         db.upsert_project(&p).unwrap();
-        let parent = HoleRecord {
-            id: new_id(),
-            project_id: p.id.clone(),
-            name: "Parent wellbore".into(),
-            unit_system: "imperial".into(),
-            survey_convention: "oilfield_from_vertical".into(),
-            azimuth_reference: "unknown".into(),
-            vsp_deg: 90.0,
-            declination_note: "".into(),
-            grid_note: "".into(),
-            parent_hole_id: None,
-            branch_md: None,
-            color: None,
-        };
+        let parent = hole(new_id(), p.id.clone(), "Parent wellbore");
         db.upsert_hole(&parent).unwrap();
-        let lat = HoleRecord {
-            id: new_id(),
-            project_id: p.id.clone(),
-            name: "Lateral B".into(),
-            unit_system: "imperial".into(),
-            survey_convention: "oilfield_from_vertical".into(),
-            azimuth_reference: "unknown".into(),
-            vsp_deg: 90.0,
-            declination_note: "".into(),
-            grid_note: "".into(),
-            parent_hole_id: Some(parent.id.clone()),
-            branch_md: Some(6500.0),
-            color: None,
-        };
+        let mut lat = hole(new_id(), p.id.clone(), "Lateral B");
+        lat.parent_hole_id = Some(parent.id.clone());
+        lat.branch_md = Some(6500.0);
         db.upsert_hole(&lat).unwrap();
         let listed = db.list_holes(&p.id).unwrap();
         assert_eq!(listed.len(), 2);
@@ -569,8 +781,15 @@ mod tests {
         assert!(cols.iter().any(|c| c == "parent_hole_id"));
         assert!(cols.iter().any(|c| c == "branch_md"));
         assert!(cols.iter().any(|c| c == "color"));
+        assert!(cols.iter().any(|c| c == "origin_id"));
+        assert!(cols.iter().any(|c| c == "vertical_datum"));
         let tcols = store.table_columns("targets").unwrap();
         assert!(tcols.iter().any(|c| c == "parent_target_id"));
+        assert!(tcols.iter().any(|c| c == "geometry_json"));
+        let scols = store.table_columns("stations").unwrap();
+        assert!(scols.iter().any(|c| c == "review_state"));
+        let dcols = store.table_columns("documents").unwrap();
+        assert!(dcols.iter().any(|c| c == "payload"));
     }
 
     #[test]
@@ -585,20 +804,7 @@ mod tests {
             notes: "".into(),
         };
         db.upsert_project(&p).unwrap();
-        let h = HoleRecord {
-            id: new_id(),
-            project_id: p.id.clone(),
-            name: "Parent wellbore".into(),
-            unit_system: "imperial".into(),
-            survey_convention: "oilfield_from_vertical".into(),
-            azimuth_reference: "unknown".into(),
-            vsp_deg: 90.0,
-            declination_note: "".into(),
-            grid_note: "".into(),
-            parent_hole_id: None,
-            branch_md: None,
-            color: None,
-        };
+        let h = hole(new_id(), p.id.clone(), "Parent wellbore");
         db.upsert_hole(&h).unwrap();
         let junction = TargetRecord {
             id: new_id(),
@@ -610,6 +816,7 @@ mod tests {
             horiz_tol: None,
             vert_tol: None,
             parent_target_id: None,
+            geometry_json: None,
         };
         let east = TargetRecord {
             id: new_id(),
@@ -621,6 +828,7 @@ mod tests {
             horiz_tol: None,
             vert_tol: None,
             parent_target_id: Some(junction.id.clone()),
+            geometry_json: None,
         };
         db.upsert_target(&junction).unwrap();
         db.upsert_target(&east).unwrap();
@@ -650,20 +858,8 @@ mod tests {
             notes: "".into(),
         };
         db.upsert_project(&p).unwrap();
-        let h = HoleRecord {
-            id: new_id(),
-            project_id: p.id.clone(),
-            name: "Lateral B".into(),
-            unit_system: "imperial".into(),
-            survey_convention: "oilfield_from_vertical".into(),
-            azimuth_reference: "unknown".into(),
-            vsp_deg: 90.0,
-            declination_note: "".into(),
-            grid_note: "".into(),
-            parent_hole_id: None,
-            branch_md: None,
-            color: Some("#7ee0e0".into()),
-        };
+        let mut h = hole(new_id(), p.id.clone(), "Lateral B");
+        h.color = Some("#7ee0e0".into());
         db.upsert_hole(&h).unwrap();
         let back = db.get_hole(&h.id).unwrap().unwrap();
         assert_eq!(back.color.as_deref(), Some("#7ee0e0"));
@@ -673,5 +869,45 @@ mod tests {
         };
         db.upsert_hole(&cleared).unwrap();
         assert_eq!(db.get_hole(&h.id).unwrap().unwrap().color, None);
+    }
+
+    #[test]
+    fn v5_review_frame_and_document_roundtrip() {
+        let db = Store::open_memory().unwrap();
+        let p = ProjectRecord {
+            id: new_id(),
+            name: "P".into(),
+            client: "".into(),
+            notes: "".into(),
+        };
+        db.upsert_project(&p).unwrap();
+        let mut h = hole(new_id(), p.id.clone(), "H1");
+        h.origin_id = "wellhead".into();
+        h.vertical_datum = "rkb".into();
+        h.vertical_datum_name = "RKB".into();
+        db.upsert_hole(&h).unwrap();
+        let mut s = station(new_id(), h.id.clone());
+        s.md = 100.0;
+        s.review_state = "unreviewed".into();
+        db.replace_stations(&h.id, std::slice::from_ref(&s))
+            .unwrap();
+        let back = db.list_stations(&h.id).unwrap();
+        assert_eq!(back[0].review_state, "unreviewed");
+        let hole_back = db.get_hole(&h.id).unwrap().unwrap();
+        assert_eq!(hole_back.origin_id, "wellhead");
+        assert_eq!(hole_back.vertical_datum, "rkb");
+        let doc = DocumentRecord {
+            id: new_id(),
+            hole_id: h.id.clone(),
+            kind: "plan".into(),
+            payload: r#"{"name":"draft"}"#.into(),
+            updated_at: "".into(),
+        };
+        db.upsert_document(&doc).unwrap();
+        let listed = db.list_documents(&h.id, Some("plan")).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert!(listed[0].payload.contains("draft"));
+        db.delete_document(&doc.id).unwrap();
+        assert!(db.list_documents(&h.id, None).unwrap().is_empty());
     }
 }

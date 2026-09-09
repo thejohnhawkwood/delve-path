@@ -1,8 +1,8 @@
 import type { CalculatedStation, Target, Trajectory, ValidationIssue } from "./domain";
 import { getPlatform, isTauri } from "./platform";
-import type { CalcRequest, HoleRecord, ProjectRecord, StationRecord } from "./records";
+import type { CalcRequest, DocumentRecord, HoleRecord, ProjectRecord, StationRecord } from "./records";
 
-export type { CalcRequest, HoleRecord, ProjectRecord, StationRecord } from "./records";
+export type { CalcRequest, DocumentRecord, HoleRecord, ProjectRecord, StationRecord } from "./records";
 export { isTauri };
 
 export async function calculate(req: CalcRequest): Promise<Trajectory> {
@@ -63,6 +63,14 @@ export async function deleteTarget(targetId: string): Promise<void> {
 
 export async function deleteHole(holeId: string): Promise<void> {
   return getPlatform().repo.deleteHole(holeId);
+}
+
+export async function saveDocument(doc: DocumentRecord): Promise<void> {
+  return getPlatform().repo.saveDocument(doc);
+}
+
+export async function loadDocuments(holeId: string, kind?: string): Promise<DocumentRecord[]> {
+  return getPlatform().repo.loadDocuments(holeId, kind);
 }
 
 export async function newUuid(): Promise<string> {

@@ -11,7 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = join(root, "src", "generated", "delve-wasm");
 
 function run(cmd, args) {
-  const result = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
+  const result = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: false });
   if (result.status !== 0) {
     throw new Error(`${cmd} ${args.join(" ")} failed with exit ${result.status}`);
   }

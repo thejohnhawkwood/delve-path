@@ -1,6 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["crates/delve-core", "crates/delve-storage", "crates/delve-wasm", "src-tauri"]
+members = [
+    "crates/delve-core",
+    "crates/delve-planning",
+    "crates/delve-assurance",
+    "crates/delve-engine",
+    "crates/delve-storage",
+    "crates/delve-wasm",
+    "src-tauri",
+]
 
 [workspace.package]
 edition = "2021"
@@ -9,6 +17,9 @@ authors = ["Philip Bird"]
 
 [workspace.dependencies]
 delve-core = { path = "crates/delve-core" }
+delve-planning = { path = "crates/delve-planning" }
+delve-assurance = { path = "crates/delve-assurance" }
+delve-engine = { path = "crates/delve-engine" }
 delve-storage = { path = "crates/delve-storage" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

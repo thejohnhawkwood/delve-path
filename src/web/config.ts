@@ -16,12 +16,12 @@ export const APPROVED_DESKTOP_DOWNLOAD_URL =
 export const desktopDownloadUrl =
   import.meta.env.VITE_DESKTOP_DOWNLOAD_URL || APPROVED_DESKTOP_DOWNLOAD_URL;
 
-export const appVersion = typeof __DELVE_VERSION__ !== "undefined" ? __DELVE_VERSION__ : "0.1.1";
+export const appVersion = typeof __DELVE_VERSION__ !== "undefined" ? __DELVE_VERSION__ : "0.2.1";
 export const gitSha = typeof __DELVE_GIT_SHA__ !== "undefined" ? __DELVE_GIT_SHA__ : "unknown";
 
 export const desktopMeta = {
-  version: import.meta.env.VITE_DESKTOP_VERSION || "0.1.1",
-  filename: import.meta.env.VITE_DESKTOP_FILENAME || "DelvePath_0.1.1_x64-setup.exe",
+  version: import.meta.env.VITE_DESKTOP_VERSION || "0.2.1",
+  filename: import.meta.env.VITE_DESKTOP_FILENAME || "DelvePath_0.2.1_x64-setup.exe",
   size: import.meta.env.VITE_DESKTOP_SIZE || "",
   date: import.meta.env.VITE_DESKTOP_DATE || "",
   sha256: import.meta.env.VITE_DESKTOP_SHA256 || "",

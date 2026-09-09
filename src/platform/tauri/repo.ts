@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Target } from "../../domain";
-import type { HoleRecord, ProjectRecord, StationRecord } from "../../records";
+import type { DocumentRecord, HoleRecord, ProjectRecord, StationRecord } from "../../records";
 import type { ProjectRepository } from "../types";
 
 export function createTauriRepository(): ProjectRepository {
@@ -50,6 +50,15 @@ export function createTauriRepository(): ProjectRepository {
     },
     deleteHole(holeId) {
       return invoke("delete_hole", { holeId });
+    },
+    saveDocument(doc) {
+      return invoke("save_document", { doc });
+    },
+    loadDocuments(holeId, kind) {
+      return invoke<DocumentRecord[]>("load_documents", { holeId, kind: kind ?? null });
+    },
+    deleteDocument(id) {
+      return invoke("delete_document", { id });
     },
     async exportSnapshot() {
       throw new Error("Use Save / the *.delvepath SQLite file on desktop. Browser JSON snapshots are a separate format.");

@@ -1,5 +1,5 @@
 import type { Target, Trajectory, ValidationIssue } from "../domain";
-import type { CalcRequest, HoleRecord, ProjectRecord, StationRecord } from "../records";
+import type { CalcRequest, DocumentRecord, HoleRecord, ProjectRecord, StationRecord } from "../records";
 
 export type RuntimeKind = "tauri" | "browser";
 
@@ -9,6 +9,7 @@ export interface CalculationService {
   projectTangentMd(req: CalcRequest, addedMd: number): Promise<Trajectory>;
   projectTangentTvd(req: CalcRequest, targetTvd: number): Promise<Trajectory>;
   projectTangentBit(req: CalcRequest, bitToSensor: number): Promise<Trajectory>;
+  engineCall<T = unknown>(op: string, payload?: unknown): Promise<T>;
 }
 
 export interface ProjectSummary {
@@ -34,6 +35,9 @@ export interface ProjectRepository {
   listHoles(projectId: string): Promise<HoleRecord[]>;
   deleteTarget(targetId: string): Promise<void>;
   deleteHole(holeId: string): Promise<void>;
+  saveDocument(doc: DocumentRecord): Promise<void>;
+  loadDocuments(holeId: string, kind?: string): Promise<DocumentRecord[]>;
+  deleteDocument(id: string): Promise<void>;
   exportSnapshot(projectId: string): Promise<BrowserProjectSnapshot>;
   importSnapshot(data: unknown): Promise<ProjectRecord>;
   resetAll(): Promise<void>;
@@ -55,7 +59,7 @@ export interface Platform {
 }
 
 export const SNAPSHOT_FORMAT = "delvepath-browser-snapshot";
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 
 export interface BrowserProjectSnapshot {
   format: typeof SNAPSHOT_FORMAT;
@@ -67,4 +71,5 @@ export interface BrowserProjectSnapshot {
   holes: HoleRecord[];
   stations: StationRecord[];
   targets: Target[];
+  documents: DocumentRecord[];
 }

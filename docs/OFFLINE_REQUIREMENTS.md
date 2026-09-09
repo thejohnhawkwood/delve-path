@@ -12,6 +12,8 @@ CDN, analytics, telemetry, API ping, Google Fonts, remote icons, update check, r
 
 CSP: `default-src 'self'`; `connect-src` IPC only.
 
+Geocertainty (or any other HTTP provider) is not called from default offline builds. Offline imported covariance is the EOU path that ships. A live connector remains **NOT YET VALIDATED**.
+
 Plotly.js (bundled locally) requires `'unsafe-eval'` on `script-src` for its plot engine. That is a **local** script allowance, not a network exception. Do not add CDN hosts to make Plotly work.
 
 ## Packaging
@@ -23,3 +25,8 @@ User data in AppData / user-chosen project file. Not `$RESOURCE`.
 ## Air-gap test
 
 See `docs/MVP_ACCEPTANCE.md` and `docs/TEST_PLAN.md`. Scan built assets for accidental `https://` fetches (docs URLs in markdown are fine; runtime must not contact them).
+
+
+## Collision lab
+
+No connected service is used. The browser's embedded worker receives a cloned compiled WASM module and can recalculate after the network is disabled (covered in Playwright). As with the existing browser demo, the website must first load; this is not an offline-installable PWA or a promise that an uncached page can reload without its host. Desktop calculations use native Rust with the existing offline CSP. Native text export/import requires a local path chosen in the operating-system dialog. No broad filesystem or network capability was added.

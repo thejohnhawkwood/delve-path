@@ -1,0 +1,14 @@
+[package]
+name = "delve-planning"
+version = "0.2.0"
+edition.workspace = true
+license.workspace = true
+description = "Forward projections, plan constructors, and Flight Deck geometry. No UI, SQLite, or networking."
+
+[dependencies]
+delve-core.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

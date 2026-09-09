@@ -1,5 +1,12 @@
 import type { Target } from "../domain";
-import type { HoleRecord, ProjectRecord, StationRecord } from "../records";
+import {
+  defaultHoleFrame,
+  defaultStationReview,
+  type DocumentRecord,
+  type HoleRecord,
+  type ProjectRecord,
+  type StationRecord,
+} from "../records";
 import {
   SNAPSHOT_FORMAT,
   SNAPSHOT_VERSION,
@@ -59,6 +66,7 @@ function parseProject(v: unknown): ProjectRecord {
 
 function parseHole(v: unknown): HoleRecord {
   if (!isRecord(v)) throw new SnapshotError("hole must be an object.");
+  const frame = defaultHoleFrame();
   return {
     id: reqString(v, "id"),
     project_id: reqString(v, "project_id"),
@@ -72,11 +80,19 @@ function parseHole(v: unknown): HoleRecord {
     parent_hole_id: optString(v, "parent_hole_id"),
     branch_md: optNumber(v, "branch_md"),
     color: optString(v, "color"),
+    origin_id: typeof v.origin_id === "string" ? v.origin_id : frame.origin_id,
+    origin_north: typeof v.origin_north === "number" && Number.isFinite(v.origin_north) ? v.origin_north : 0,
+    origin_east: typeof v.origin_east === "number" && Number.isFinite(v.origin_east) ? v.origin_east : 0,
+    vertical_datum: typeof v.vertical_datum === "string" ? v.vertical_datum : frame.vertical_datum,
+    vertical_datum_name: typeof v.vertical_datum_name === "string" ? v.vertical_datum_name : "",
+    crs_epsg: typeof v.crs_epsg === "number" && Number.isFinite(v.crs_epsg) ? v.crs_epsg : null,
+    crs_note: typeof v.crs_note === "string" ? v.crs_note : "",
   };
 }
 
 function parseStation(v: unknown): StationRecord {
   if (!isRecord(v)) throw new SnapshotError("station must be an object.");
+  const review = defaultStationReview();
   return {
     id: reqString(v, "id"),
     hole_id: reqString(v, "hole_id"),
@@ -90,6 +106,11 @@ function parseStation(v: unknown): StationRecord {
     tvd_tie: optNumber(v, "tvd_tie"),
     north_tie: optNumber(v, "north_tie"),
     east_tie: optNumber(v, "east_tie"),
+    review_state: typeof v.review_state === "string" ? v.review_state : review.review_state,
+    reviewer: typeof v.reviewer === "string" ? v.reviewer : "",
+    review_source: typeof v.review_source === "string" ? v.review_source : "",
+    reviewed_at: optString(v, "reviewed_at"),
+    exclusion_reason: typeof v.exclusion_reason === "string" ? v.exclusion_reason : "",
   };
 }
 
@@ -105,10 +126,22 @@ function parseTarget(v: unknown): Target {
     horiz_tol: optNumber(v, "horiz_tol"),
     vert_tol: optNumber(v, "vert_tol"),
     parent_target_id: optString(v, "parent_target_id"),
+    geometry_json: optString(v, "geometry_json"),
   };
 }
 
-/** Validate imported JSON. Throws SnapshotError without mutating caller state. */
+function parseDocument(v: unknown): DocumentRecord {
+  if (!isRecord(v)) throw new SnapshotError("document must be an object.");
+  return {
+    id: reqString(v, "id"),
+    hole_id: reqString(v, "hole_id"),
+    kind: reqString(v, "kind"),
+    payload: reqString(v, "payload"),
+    updated_at: typeof v.updated_at === "string" ? v.updated_at : "",
+  };
+}
+
+/** Validate imported JSON. v1 snapshots migrate to v2. Throws SnapshotError without mutating caller state. */
 export function parseSnapshot(data: unknown): BrowserProjectSnapshot {
   if (!isRecord(data)) throw new SnapshotError("Snapshot must be a JSON object.");
   if (data.format !== SNAPSHOT_FORMAT) {
@@ -116,8 +149,9 @@ export function parseSnapshot(data: unknown): BrowserProjectSnapshot {
       "Not a DelvePath browser snapshot. Desktop *.delvepath SQLite files cannot be imported here."
     );
   }
-  if (data.formatVersion !== SNAPSHOT_VERSION) {
-    throw new SnapshotError(`Unsupported snapshot version ${String(data.formatVersion)}.`);
+  const version = data.formatVersion;
+  if (version !== 1 && version !== 2) {
+    throw new SnapshotError(`Unsupported snapshot version ${String(version)}.`);
   }
   if (!Array.isArray(data.holes) || !Array.isArray(data.stations) || !Array.isArray(data.targets)) {
     throw new SnapshotError("Snapshot must include holes, stations, and targets arrays.");
@@ -126,6 +160,7 @@ export function parseSnapshot(data: unknown): BrowserProjectSnapshot {
   const holes = data.holes.map(parseHole);
   const stations = data.stations.map(parseStation);
   const targets = data.targets.map(parseTarget);
+  const documents = Array.isArray(data.documents) ? data.documents.map(parseDocument) : [];
   const holeIds = new Set(holes.map((h) => h.id));
   if (holes.some((h) => h.project_id !== project.id)) {
     throw new SnapshotError("A hole references the wrong project.");
@@ -135,6 +170,9 @@ export function parseSnapshot(data: unknown): BrowserProjectSnapshot {
   }
   if (targets.some((t) => t.hole_id && !holeIds.has(t.hole_id))) {
     throw new SnapshotError("A target references a missing hole.");
+  }
+  if (documents.some((d) => !holeIds.has(d.hole_id))) {
+    throw new SnapshotError("A document references a missing hole.");
   }
   return {
     format: SNAPSHOT_FORMAT,
@@ -146,6 +184,7 @@ export function parseSnapshot(data: unknown): BrowserProjectSnapshot {
     holes,
     stations,
     targets,
+    documents,
   };
 }
 
@@ -154,6 +193,7 @@ export function buildSnapshot(input: {
   holes: HoleRecord[];
   stations: StationRecord[];
   targets: Target[];
+  documents?: DocumentRecord[];
   applicationVersion: string;
 }): BrowserProjectSnapshot {
   return {
@@ -166,5 +206,6 @@ export function buildSnapshot(input: {
     holes: input.holes,
     stations: input.stations,
     targets: input.targets,
+    documents: input.documents ?? [],
   };
 }

@@ -2,14 +2,28 @@ export type UnitSystem = "metric" | "imperial";
 export type SurveyConvention = "oilfield_from_vertical";
 export type AzimuthReference = "true" | "grid" | "magnetic" | "unknown";
 export type StationClass = "measured" | "projected" | "planned";
+export type ReviewState = "unreviewed" | "accepted" | "excluded";
+
+export const FT_TO_M = 0.3048;
+
+export function convertLength(value: number, from: UnitSystem, to: UnitSystem): number {
+  if (from === to || !Number.isFinite(value)) return value;
+  return from === "imperial" ? value * FT_TO_M : value / FT_TO_M;
+}
 
 export interface MeasuredStation {
+  id?: string;
   md: number;
   inc_deg: number;
   azi_deg: number;
   comment: string;
   class: StationClass;
   source: "manual" | "paste" | "csv" | "tie_in";
+  review_state?: ReviewState;
+  reviewer?: string;
+  review_source?: string;
+  reviewed_at?: string | null;
+  exclusion_reason?: string;
 }
 
 export interface TieIn {
@@ -60,6 +74,7 @@ export interface Target {
   vert_tol: number | null;
   /** Null = junction / standalone. Set = child of that junction (BHL or intermediate). */
   parent_target_id: string | null;
+  geometry_json?: string | null;
 }
 
 export function emptyRow(md = 0): MeasuredStation {
@@ -70,6 +85,11 @@ export function emptyRow(md = 0): MeasuredStation {
     comment: "",
     class: "measured",
     source: "manual",
+    review_state: "unreviewed",
+    reviewer: "",
+    review_source: "",
+    reviewed_at: null,
+    exclusion_reason: "",
   };
 }
 

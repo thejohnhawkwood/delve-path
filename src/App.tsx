@@ -14,6 +14,7 @@ import {
   projectTangentBit,
   projectTangentMd,
   projectTangentTvd,
+  saveDocument,
   saveHole,
   saveStations,
   saveTarget,
@@ -22,8 +23,19 @@ import {
   type ProjectRecord,
   type StationRecord,
 } from "./api";
-import { type HoleOverlay } from "./Charts";
+import { type ExtraPath, type HoleOverlay, type TargetOutlineTrace } from "./Charts";
+import { boundsFor3d } from "./chartBounds";
 import { getPlatform } from "./platform";
+import { comparableDemoFrame, defaultHoleFrame, defaultStationReview } from "./records";
+import { convertHoleLengths } from "./unitsConvert";
+import { PlanningWorkspace } from "./workspaces/PlanningWorkspace";
+import { FlightDeckWorkspace } from "./workspaces/FlightDeckWorkspace";
+import { TargetsWorkspace, type TargetOutline } from "./workspaces/TargetsWorkspace";
+import { CenterlineWorkspace } from "./workspaces/CenterlineWorkspace";
+import { DepthWorkspace } from "./workspaces/DepthWorkspace";
+import { ReportsWorkspace } from "./workspaces/ReportsWorkspace";
+import { EouWorkspace } from "./workspaces/EouWorkspace";
+import { CollisionWorkspace } from "./workspaces/CollisionWorkspace";
 import { AboutDialog } from "./web/AboutDialog";
 import { ProjectChooser } from "./web/ProjectChooser";
 
@@ -34,6 +46,7 @@ import type {
   AzimuthReference,
   CalculatedStation,
   MeasuredStation,
+  ReviewState,
   Target,
   TieIn,
   Trajectory,
@@ -47,7 +60,8 @@ import { StartHere } from "./StartHere";
 import { SurveyGrid, type SurveyHoleGroup } from "./SurveyGrid";
 import { Tip } from "./Tip";
 
-type Tab = "plan" | "profile" | "3d" | "target";
+type ChartTab = "planView" | "profile" | "3d" | "target";
+type Workspace = "survey" | "planning" | "flightdeck" | "targets" | "centerline" | "depth" | "reports" | "eou" | "collision";
 type ProjKind = "none" | "md" | "tvd" | "bit";
 
 const OREGON_CSV = `md_ft,incl_deg,azi_deg,comment
@@ -123,7 +137,25 @@ export default function App() {
   const [traj, setTraj] = useState<Trajectory | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [selected, setSelected] = useState(0);
-  const [tab, setTab] = useState<Tab>("plan");
+  const [tab, setTab] = useState<ChartTab>("planView");
+  const [workspace, setWorkspace] = useState<Workspace>("survey");
+  const [extraPaths, setExtraPaths] = useState<ExtraPath[]>([]);
+  const [focusEou, setFocusEou] = useState(true);
+  const receiveEouPaths = useCallback((paths: ExtraPath[]) => {
+    setExtraPaths((prev) => [...prev.filter((p) => !p.name.startsWith("EOU")), ...paths]);
+    if (paths.length) setFocusEou(true);
+  }, []);
+  const eouBounds = useMemo(() => {
+    const mesh = extraPaths.find((p) => p.name.startsWith("EOU") && p.mesh)?.mesh;
+    return mesh ? boundsFor3d([{
+      x: mesh.vertices.map((p) => p[1]), y: mesh.vertices.map((p) => p[0]), z: mesh.vertices.map((p) => p[2]),
+    }]) : undefined;
+  }, [extraPaths]);
+  const [targetOutlines, setTargetOutlines] = useState<TargetOutlineTrace[]>([]);
+  const [profileTargetMode, setProfileTargetMode] = useState<"intersection" | "projection">("projection");
+  const [planStations, setPlanStations] = useState<
+    { md: number; inc_deg: number; azi_deg: number; north: number; east: number; tvd: number; dls_display: number }[]
+  >([]);
   const [status, setStatus] = useState("No project open — New or Open, or enter a survey.");
   const [projKind, setProjKind] = useState<ProjKind>("none");
   const [projVal, setProjVal] = useState(100);
@@ -245,7 +277,7 @@ export default function App() {
     if (!project || !hole) return;
     const measured = measuredOnly(rows);
     const recs: StationRecord[] = measured.map((s, i) => ({
-      id: crypto.randomUUID(),
+      id: s.id || crypto.randomUUID(),
       hole_id: hole.id,
       seq: i,
       md: s.md,
@@ -257,8 +289,15 @@ export default function App() {
       tvd_tie: i === 0 ? tie.tvd : null,
       north_tie: i === 0 ? tie.north : null,
       east_tie: i === 0 ? tie.east : null,
+      ...defaultStationReview(),
+      review_state: s.review_state ?? "unreviewed",
+      reviewer: s.reviewer ?? "",
+      review_source: s.review_source ?? "",
+      reviewed_at: s.reviewed_at ?? null,
+      exclusion_reason: s.exclusion_reason ?? "",
     }));
     const h: HoleRecord = {
+      ...defaultHoleFrame(),
       ...hole,
       unit_system: unit,
       survey_convention: "oilfield_from_vertical",
@@ -317,6 +356,7 @@ export default function App() {
       parent_hole_id: null,
       branch_md: null,
       color: null,
+      ...defaultHoleFrame(),
     };
     await saveHole(h);
     await saveStations(h.id, []);
@@ -357,12 +397,18 @@ export default function App() {
     setVsp(h.vsp_deg);
     const st = await loadStations(h.id);
     const mapped: MeasuredStation[] = st.map((s) => ({
+      id: s.id,
       md: s.md,
       inc_deg: s.inc_deg,
       azi_deg: s.azi_deg,
       comment: s.comment,
       class: asClass(s.class),
       source: (s.source as MeasuredStation["source"]) || "manual",
+      review_state: (s.review_state as ReviewState) || "unreviewed",
+      reviewer: s.reviewer,
+      review_source: s.review_source,
+      reviewed_at: s.reviewed_at,
+      exclusion_reason: s.exclusion_reason,
     }));
     setRows(mapped.length ? mapped : [emptyRow(0)]);
     if (st[0]) {
@@ -726,6 +772,7 @@ export default function App() {
       parent_hole_id: null,
       branch_md: null,
       color: null,
+      ...defaultHoleFrame(),
       ...extra,
     };
   }
@@ -749,7 +796,7 @@ export default function App() {
     await saveStations(
       h.id,
       measured.map((s, i) => ({
-        id: crypto.randomUUID(),
+        id: s.id || crypto.randomUUID(),
         hole_id: h.id,
         seq: i,
         md: s.md,
@@ -761,6 +808,12 @@ export default function App() {
         tvd_tie: i === 0 ? d.tie.tvd : null,
         north_tie: i === 0 ? d.tie.north : null,
         east_tie: i === 0 ? d.tie.east : null,
+        ...defaultStationReview(),
+        review_state: s.review_state ?? "unreviewed",
+        reviewer: s.reviewer ?? "",
+        review_source: s.review_source ?? "",
+        reviewed_at: s.reviewed_at ?? null,
+        exclusion_reason: s.exclusion_reason ?? "",
       }))
     );
     for (const t of d.targets) await saveTarget({ ...t, hole_id: h.id });
@@ -772,8 +825,13 @@ export default function App() {
     const pid = project?.id ?? "";
     const parentRows = parseStations(DUAL_PARENT_CSV);
     const latRows = parseStations(DUAL_LATERAL_B_CSV);
-    const parentHole = makeHoleRec(parentId, pid, "Parent wellbore");
+    const parentHole = makeHoleRec(parentId, pid, "Parent wellbore", {
+      ...comparableDemoFrame(),
+      azimuth_reference: "grid",
+    });
     const latHole = makeHoleRec(latId, pid, "Lateral B", {
+      ...comparableDemoFrame(),
+      azimuth_reference: "grid",
       parent_hole_id: parentId,
       branch_md: 6500,
     });
@@ -805,7 +863,7 @@ export default function App() {
       rows: parentRows,
       tie: { tvd: 0, north: 0, east: 0 },
       unit: "imperial",
-      aziRef: "unknown",
+      aziRef: "grid",
       vsp: 90,
       targets: parentTargets,
     };
@@ -813,7 +871,7 @@ export default function App() {
       rows: latRows,
       tie: { tvd: 6500, north: 0, east: 0 },
       unit: "imperial",
-      aziRef: "unknown",
+      aziRef: "grid",
       vsp: 90,
       targets: latTargets,
     };
@@ -1129,6 +1187,23 @@ export default function App() {
     scheduleSave();
   }
 
+  async function persistDocuments(docs: { kind: string; payload: unknown }[]) {
+    if (!hole || !project) return;
+    try {
+      for (const d of docs) {
+        await saveDocument({
+          id: `${hole.id}:${d.kind}`,
+          hole_id: hole.id,
+          kind: d.kind,
+          payload: JSON.stringify(d.payload),
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      setStatus(`Could not save workspace document: ${String(error)}`);
+    }
+  }
+
   const gridGroups: SurveyHoleGroup[] = (() => {
     const list = orderHoles(holeList);
     if (list.length === 0) {
@@ -1160,6 +1235,27 @@ export default function App() {
         for collision avoidance, well control, or steering decisions. Minimum Curvature (ISCWSA).
         Not claimed bit-identical to WinSERVE.
       </div>
+      <nav className="workspace-nav" aria-label="Workspaces">
+        {(
+          [
+            ["survey", "Survey"],
+            ["planning", "Planning"],
+            ["collision", "Anti-collision"],
+            ["flightdeck", "Flight Deck"],
+            ["targets", "Targets"],
+            ["centerline", "Centerline"],
+            ["depth", "Depth"],
+            ["reports", "Reports"],
+            ["eou", "EOU"],
+          ] as const
+        ).map(([id, label]) => (
+          <button key={id} type="button" className={workspace === id ? "on" : ""} onClick={() => setWorkspace(id)}>
+            {label}
+          </button>
+        ))}
+      </nav>
+      {workspace === "collision" && <CollisionWorkspace holeId={hole?.id ?? null} />}
+      <div className="legacy-workspace" hidden={workspace === "collision"}>
       <div className="toolbar">
         <span className="name">DELVEPATH</span>
         <button className="primary" onClick={() => setStartHere(true)}>
@@ -1243,7 +1339,28 @@ export default function App() {
           <select
             value={unit}
             onChange={(e) => {
-              setUnit(e.target.value as UnitSystem);
+              const next = e.target.value as UnitSystem;
+              if (next === unit) return;
+              const hasData =
+                measuredOnly(rows).some((r) => r.md !== 0 || r.inc_deg !== 0) ||
+                targets.length > 0 ||
+                tie.tvd !== 0 ||
+                tie.north !== 0 ||
+                tie.east !== 0;
+              if (hasData) {
+                const converted = convertHoleLengths(unit, next, hole ?? makeHoleRec("tmp", "", "tmp"), rows, targets, tie);
+                setRows(converted.rows);
+                setTargets(converted.targets);
+                setTie(converted.tie);
+                if (hole) {
+                  setHole({ ...hole, ...converted.hole, id: hole.id, project_id: hole.project_id, name: hole.name });
+                }
+                setProjVal((v) => (projKind === "none" ? v : converted.hole.unit_system === next ? (projKind === "md" || projKind === "tvd" || projKind === "bit" ? (unit === "imperial" ? v * 0.3048 : v / 0.3048) : v) : v));
+              }
+              setUnit(next);
+              setExtraPaths([]);
+              setTargetOutlines([]);
+              setPlanStations([]);
               scheduleSave();
             }}
           >
@@ -1472,6 +1589,167 @@ export default function App() {
         </section>
 
         <div className="grid-panel">
+            <div className="workspace-host" hidden={workspace === "survey"}>
+              {workspace === "planning" && (
+                <PlanningWorkspace
+                  unit={unit}
+                  vspDeg={vsp}
+                  onPlanStations={(stations, _name, paths) => {
+                    setPlanStations(stations);
+                    setExtraPaths((prev) => [...prev.filter((p) => !p.name.startsWith("PLANNED")), ...paths]);
+                  }}
+                  onDocuments={(docs) => void persistDocuments(docs)}
+                />
+              )}
+              {workspace === "flightdeck" && (
+                <FlightDeckWorkspace
+                  unit={unit}
+                  holeId={hole?.id ?? "demo-hole"}
+                  vspDeg={vsp}
+                  latestAccepted={rows.filter((r) => r.review_state === "accepted").slice(-1)[0]?.review_state}
+                  onDemoLoaded={(demo) => {
+                    setUnit("imperial");
+                    setAziRef("grid");
+                    setVsp(45);
+                    setTie({ tvd: 0, north: 0, east: 0 });
+                    setRows(
+                      demo.surveys.map((s) => ({
+                        ...emptyRow(s.md),
+                        id: crypto.randomUUID(),
+                        inc_deg: s.inc_deg,
+                        azi_deg: s.azi_deg,
+                        review_state: s.accepted ? "accepted" : "unreviewed",
+                        reviewer: s.accepted ? "demo" : "",
+                        review_source: "synthetic",
+                        reviewed_at: s.accepted ? "2026-08-28T00:00:00Z" : null,
+                        comment: s.accepted ? "ACCEPTED SURVEY" : "held-out until reveal",
+                      }))
+                    );
+                    if (hole) {
+                      setHole({
+                        ...hole,
+                        ...comparableDemoFrame(),
+                        azimuth_reference: "grid",
+                        unit_system: "imperial",
+                        vsp_deg: 45,
+                      });
+                    }
+                    const land = demo.plan.stations.slice(-1)[0];
+                    if (land) {
+                      const t: Target = {
+                        id: selectedTarget?.id ?? crypto.randomUUID(),
+                        hole_id: hole?.id ?? "",
+                        name: "Landing target",
+                        north: land.north,
+                        east: land.east,
+                        tvd: land.tvd,
+                        horiz_tol: 50,
+                        vert_tol: 20,
+                        parent_target_id: null,
+                      };
+                      setTargets([t]);
+                      setSelectedTargetId(t.id);
+                      fillForm(t);
+                    }
+                    setPlanStations(
+                      demo.plan.stations.map((s) => ({
+                        md: s.md,
+                        inc_deg: s.inc_deg,
+                        azi_deg: s.azi_deg,
+                        north: s.north,
+                        east: s.east,
+                        tvd: s.tvd,
+                        dls_display: 0,
+                      }))
+                    );
+                    setStatus(`${demo.name} — ${demo.mark}`);
+                    setWorkspace("flightdeck");
+                    scheduleSave();
+                  }}
+                  onPaths={(paths) =>
+                    setExtraPaths((prev) => [
+                      ...prev.filter(
+                        (p) =>
+                          !p.name.startsWith("PLANNED") &&
+                          !p.name.startsWith("ESTIMATED") &&
+                          !p.name.startsWith("SCENARIO") &&
+                          !p.name.startsWith("BHA")
+                      ),
+                      ...paths,
+                    ])
+                  }
+                  onDocuments={(docs) => void persistDocuments(docs)}
+                />
+              )}
+              {workspace === "targets" && (
+                <>
+                  <label className="muted">
+                    Profile target display
+                    <select
+                      value={profileTargetMode}
+                      onChange={(e) => setProfileTargetMode(e.target.value as "intersection" | "projection")}
+                    >
+                      <option value="projection">orthogonal projection</option>
+                      <option value="intersection">section-plane intersection</option>
+                    </select>
+                  </label>
+                  <TargetsWorkspace
+                    unit={unit}
+                    vsp={vsp}
+                    targets={catalog}
+                    onChange={(t) => commitTarget(t)}
+                    onOutlines={(o: TargetOutline[]) => setTargetOutlines(o)}
+                  />
+                </>
+              )}
+              {workspace === "centerline" && (
+                <CenterlineWorkspace
+                  unit={unit}
+                  holes={holeList}
+                  current={hole}
+                  stations={calcStations}
+                  overlays={overlays}
+                  onResult={(s) => {
+                    if (!s) return;
+                    setExtraPaths((prev) => [
+                      ...prev.filter((p) => p.name !== "Closest approach"),
+                      {
+                        name: "Closest approach",
+                        color: "#e0c36a",
+                        dash: "dot",
+                        points: [
+                          { north: s.ref_n, east: s.ref_e, tvd: s.ref_tvd },
+                          { north: s.off_n, east: s.off_e, tvd: s.off_tvd },
+                        ],
+                      },
+                    ]);
+                  }}
+                />
+              )}
+              {workspace === "depth" && <DepthWorkspace unit={unit} traj={traj} />}
+              {workspace === "reports" && (
+                <ReportsWorkspace
+                  projectName={project?.name ?? "Untitled"}
+                  hole={hole}
+                  traj={traj}
+                  unit={unit}
+                  targets={catalog}
+                  rows={rows}
+                  planStations={planStations}
+                />
+              )}
+              <div hidden={workspace !== "eou"}>
+                <EouWorkspace
+                  vspDeg={vsp}
+                  unit={unit}
+                  holeId={hole?.id ?? ""}
+                  station={calcStations[selected] ?? null}
+                  onPaths={receiveEouPaths}
+                />
+              </div>
+            </div>
+          {workspace === "survey" && (
+          <>
           <div className="grid-actions">
             <button type="button" onClick={() => addSurveyRows(1)}>
               Add row
@@ -1486,6 +1764,22 @@ export default function App() {
               Holds last INC/AZI · steps MD {unit === "imperial" ? 100 : 30} {lengthLabel(unit)} ·
               ⎘ copies a row (Ctrl+C) · paste appends if MD continues
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                const at = new Date().toISOString();
+                setRows((prev) =>
+                  prev.map((r) =>
+                    (r.review_state ?? "unreviewed") === "unreviewed"
+                      ? { ...r, review_state: "accepted", reviewer: "user", review_source: "bulk", reviewed_at: at }
+                      : r
+                  )
+                );
+                scheduleSave();
+              }}
+            >
+              Accept unreviewed
+            </button>
           </div>
           <SurveyGrid
             groups={gridGroups}
@@ -1503,12 +1797,32 @@ export default function App() {
             }}
             onDelete={deleteRow}
             onCopy={(row, pos) => void copyStationRow(row, pos)}
+            onReview={(i, state) => {
+              const at = new Date().toISOString();
+              setRows((prev) =>
+                prev.map((r, j) =>
+                  j === i
+                    ? {
+                        ...r,
+                        review_state: state,
+                        reviewer: "user",
+                        review_source: "grid",
+                        reviewed_at: at,
+                        exclusion_reason: state === "excluded" ? r.exclusion_reason || "excluded by reviewer" : "",
+                      }
+                    : r
+                )
+              );
+              scheduleSave();
+            }}
           />
+          </>
+          )}
         </div>
 
         <section className="viz">
           <div className="tabs">
-            <button className={tab === "plan" ? "on" : ""} onClick={() => setTab("plan")}>
+            <button className={tab === "planView" ? "on" : ""} onClick={() => setTab("planView")}>
               <Tip id="planView" on={tipsOn}>
                 Plan
               </Tip>
@@ -1529,6 +1843,14 @@ export default function App() {
               </Tip>
             </button>
           </div>
+          {workspace === "eou" && eouBounds && tab !== "target" && (
+            <div className="eou-view-controls">
+              <button onClick={() => setFocusEou((value) => !value)}>
+                {focusEou ? "Show entire path" : "Focus uncertainty"}
+              </button>
+              <span>{focusEou ? "Focused on imported uncertainty · true scale" : "Entire path · true scale"}</span>
+            </div>
+          )}
           {tab === "target" ? (
             <div className="target-delta">
               <p>
@@ -1735,7 +2057,7 @@ export default function App() {
               )}
             </div>
           ) : (
-            <Suspense fallback={<p className="workspace-loading">Loading plots…</p>}>
+            workspace !== "collision" && <Suspense fallback={<p className="workspace-loading">Loading plots…</p>}>
               <Charts
                 tab={tab}
                 stations={calcStations}
@@ -1745,6 +2067,11 @@ export default function App() {
                 vspDeg={vsp}
                 currentHoleId={hole?.id ?? null}
                 onPickStation={(holeId, index) => void pickStation(holeId, index)}
+                extraPaths={extraPaths}
+                targetOutlines={targetOutlines}
+                profileTargetMode={profileTargetMode}
+                focusBounds={workspace === "eou" && focusEou ? eouBounds : undefined}
+                unitLabel={lengthLabel(unit)}
               />
             </Suspense>
           )}
@@ -1772,6 +2099,7 @@ export default function App() {
           style={{ width: 80 }}
         />
         <span>{status}</span>
+      </div>
       </div>
       {startHere && (
         <StartHere

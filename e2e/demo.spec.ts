@@ -19,6 +19,17 @@ test("dual-lateral overlays and projections stay labelled", async ({ page }) => 
   await expect(page.getByText("PROJECTED").first()).toBeVisible({ timeout: 10_000 });
 });
 
+test("Curve Recovery Flight Deck reveal scores frozen forecasts", async ({ page }) => {
+  await page.goto("/#workspace");
+  await page.getByRole("button", { name: "Flight Deck" }).click();
+  await page.getByRole("button", { name: "Load Curve Recovery demo" }).click();
+  await expect(page.getByText(/Curve Recovery — Plan & Flight Deck/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/ACCEPTED SURVEY sensor MD/)).toBeVisible();
+  await page.getByRole("button", { name: "Reveal held-out synthetic survey" }).click();
+  await expect(page.getByText(/n → n\+1/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Forecasts stayed frozen/)).toBeVisible();
+});
+
 test("source and Mithril links are safe", async ({ page }) => {
   await page.goto("/");
   const source = page.getByRole("navigation", { name: "DelvePath" }).getByRole("link", { name: "Source" });

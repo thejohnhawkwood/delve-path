@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, type KeyboardEvent } from "react";
-import type { CalculatedStation, MeasuredStation, UnitSystem } from "./domain";
+import type { CalculatedStation, MeasuredStation, ReviewState, UnitSystem } from "./domain";
 import { dlsLabel, fmt, lengthLabel } from "./domain";
 import { Tip } from "./Tip";
 
@@ -22,10 +22,11 @@ interface Props {
   onEnterLast: (i: number) => void;
   onDelete: (i: number) => void;
   onCopy: (row: MeasuredStation, pos?: { north: number; east: number; tvd: number } | null) => void;
+  onReview?: (i: number, state: ReviewState) => void;
 }
 
 const EDIT = ["md", "inc_deg", "azi_deg", "comment"] as const;
-const COLS = 14;
+const COLS = 15;
 
 export function SurveyGrid({
   groups,
@@ -38,6 +39,7 @@ export function SurveyGrid({
   onEnterLast,
   onDelete,
   onCopy,
+  onReview,
 }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const len = lengthLabel(unit);
@@ -138,6 +140,11 @@ export function SurveyGrid({
             <th>
               <Tip id="dls" on={tipsOn}>
                 DLS {dlsLabel(unit)}
+              </Tip>
+            </th>
+            <th className="c">
+              <Tip id="review" on={tipsOn}>
+                Review
               </Tip>
             </th>
             <th className="c">
@@ -246,6 +253,23 @@ export function SurveyGrid({
                     </td>
                     <td>
                       <input className="calc" readOnly tabIndex={-1} value={c ? fmt(c.dls) : ""} />
+                    </td>
+                    <td>
+                      {active && onReview ? (
+                        <select
+                          className={`review-state ${(r.review_state ?? "unreviewed").replace(/\s/g, "-")}`}
+                          value={r.review_state ?? "unreviewed"}
+                          onChange={(e) => onReview(i, e.target.value as ReviewState)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Review row ${i + 1}`}
+                        >
+                          <option value="unreviewed">unreviewed</option>
+                          <option value="accepted">accepted</option>
+                          <option value="excluded">excluded</option>
+                        </select>
+                      ) : (
+                        <input className="calc c" readOnly tabIndex={-1} value={r.review_state ?? "unreviewed"} />
+                      )}
                     </td>
                     <td>
                       {active ? (

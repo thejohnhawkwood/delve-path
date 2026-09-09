@@ -18,4 +18,12 @@ export const tauriCalc: CalculationService = {
   projectTangentBit(req, bitToSensor) {
     return invoke<Trajectory>("project_tangent_bit", { req, bitToSensor });
   },
+  async engineCall<T = unknown>(op: string, payload: unknown = {}) {
+    const raw = await invoke<string>("engine_call", { req: JSON.stringify({ op, payload }) });
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      throw new Error(raw);
+    }
+  },
 };

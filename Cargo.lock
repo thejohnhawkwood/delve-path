@@ -573,10 +573,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "delve-assurance"
+version = "0.2.0"
+dependencies = [
+ "delve-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "delve-core"
 version = "0.1.0"
 dependencies = [
  "csv",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "delve-engine"
+version = "0.2.0"
+dependencies = [
+ "delve-assurance",
+ "delve-core",
+ "delve-planning",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "delve-planning"
+version = "0.2.0"
+dependencies = [
+ "delve-core",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -595,9 +627,10 @@ dependencies = [
 
 [[package]]
 name = "delve-wasm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "delve-core",
+ "delve-engine",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
@@ -606,9 +639,10 @@ dependencies = [
 
 [[package]]
 name = "delvepath"
-version = "0.1.1"
+version = "0.2.1"
 dependencies = [
  "delve-core",
+ "delve-engine",
  "delve-storage",
  "serde",
  "serde_json",

@@ -23,6 +23,13 @@ function api(): WasmApi {
   return wasm;
 }
 
+/** Share the already compiled module with local workers; no second fetch offline. */
+export function browserWasmModule(): WebAssembly.Module {
+  const module = (api().default as unknown as { __wbindgen_wasm_module?: WebAssembly.Module }).__wbindgen_wasm_module;
+  if (!module) throw new Error("Compiled WASM module is unavailable.");
+  return module;
+}
+
 export const browserCalc: CalculationService = {
   async calculate(req: CalcRequest): Promise<Trajectory> {
     return api().calculate(req) as Trajectory;
@@ -38,5 +45,13 @@ export const browserCalc: CalculationService = {
   },
   async projectTangentBit(req: CalcRequest, bitToSensor: number): Promise<Trajectory> {
     return api().project_tangent_bit(req, bitToSensor) as Trajectory;
+  },
+  async engineCall<T = unknown>(op: string, payload: unknown = {}): Promise<T> {
+    const raw = api().engine_call(JSON.stringify({ op, payload })) as string;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      throw new Error(raw);
+    }
   },
 };

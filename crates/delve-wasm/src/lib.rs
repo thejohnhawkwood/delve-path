@@ -96,6 +96,11 @@ mod bindgen_api {
         let req = parse_req(req)?;
         to_js(&project_tangent_bit_req(&req, bit_to_sensor).map_err(js_err)?)
     }
+
+    #[wasm_bindgen]
+    pub fn engine_call(req: String) -> Result<String, JsValue> {
+        delve_engine::engine_call_json(&req).map_err(js_err)
+    }
 }
 
 #[cfg(test)]

@@ -16,7 +16,7 @@ export { parseSnapshot, SnapshotError, buildSnapshot } from "./snapshot";
 
 let platform: Platform | null = null;
 
-export async function initPlatform(applicationVersion = "0.1.1"): Promise<Platform> {
+export async function initPlatform(applicationVersion = "0.2.0"): Promise<Platform> {
   if (platform) return platform;
   if (isTauri()) {
     const { createTauriPlatform } = await import("./tauri/adapter");
