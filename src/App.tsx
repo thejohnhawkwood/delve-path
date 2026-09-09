@@ -1814,7 +1814,7 @@ export default function App() {
                 />
               </div>
               <div hidden={workspace !== "collision"}>
-                <CollisionWorkspace holeId={hole?.id ?? null} sharedInput={collisionInput}
+                <CollisionWorkspace holeId={project ? hole?.id ?? null : null} sharedInput={collisionInput}
                   stale={!!collisionInput && caseModelKey !== collisionContextKey}
                   forecast={flightSelection} onUseActive={prepareCollision} onDemoLoaded={adoptCrossingCase}
                   onPaths={receiveCollision} onNavigate={() => { setWorkspace("eou"); setTab("3d"); }}

@@ -434,6 +434,7 @@ export function CollisionWorkspace({ holeId, sharedInput, stale, forecast, onUse
     <p>Use the active hole, its selected Flight Deck forecast, and the other holes in this project. Each hole needs a source-labelled uncertainty envelope.</p>
     <div className="ws-row"><button className="primary" onClick={() => void useActive()}>Use active hole & forecast</button><button onClick={() => void loadDemo()}>Load crossing demo</button><button onClick={() => void importFile()}>Import case / audit</button></div>
     <p>The crossing example loads three holes into Survey: a northbound active lateral, an eastbound crossing ahead, and a lower lateral that limits a downward detour. Start here for a complete walkthrough.</p>
+    {!holeId && <p>Use Save in the project toolbar before storing calculation runs. You can compare and export without saving a project.</p>}
     {saved.length > 0 && <details><summary>Save, export &amp; replay</summary><p>These runs contain their own inputs. Replay reconstructs that recorded snapshot.</p><select aria-label="Saved collision run" value={savedId} onChange={e => setSavedId(e.target.value)}><option value="">Choose saved run…</option>{saved.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select><button disabled={!savedId} onClick={() => { const s = saved.find(s => s.id === savedId); if (s) void importText(s.payload); }}>Replay saved run</button></details>}
     {error && <p role="alert" className="error">{error} <button onClick={onNavigate}>Open Uncertainty</button></p>}
   </div>;
@@ -612,8 +613,8 @@ export function CollisionWorkspace({ holeId, sharedInput, stale, forecast, onUse
             </div>
             {!holeId && (
               <p>
-                Open a project in Survey to save a run there. File exports work
-                independently.
+                Use Save in the project toolbar to store the working holes first.
+                Then save this calculation run. File exports work independently.
               </p>
             )}
             {saved.length > 0 && (
